@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <script src="/i18n.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>AI Assistant - Ollama & XAI</title>
+  <!-- Tailwind CSS for styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    /* כל הסטיילים שלך נשארו בדיוק כמו שהיו */
+    .custom::-webkit-scrollbar { width: 8px; }
+    .custom::-webkit-scrollbar-track { background: #f1f1f1; }
+    .custom::-webkit-scrollbar-thumb { background: #c7d2fe; border-radius: 4px; }
+    .custom::-webkit-scrollbar-thumb:hover { background: #a5b4fc; }
+    .fade-in { animation: fadeIn .3s ease-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; }
+    }
+    .tab-button { border-bottom: 2px solid transparent; transition: all 0.2s ease; }
+    .tab-button.active { border-bottom-color: #4f46e5; }
+    .error-message { background-color: #fee2e2; color: #dc2626; padding: 8px; border-radius: 4px; }
+    .loading-dots::after { content: '.'; animation: dots 1.5s steps(5, end) infinite; }
+    @keyframes dots {
+      0%, 20% { content: '.'; }
+      40% { content: '..'; }
+      60% { content: '...'; }
+      80%, 100% { content: ''; }
+    }
+    .pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .slide-in { animation: slideIn 0.3s ease-out; }
+    @keyframes slideIn {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+    .slide-out { animation: slideOut 0.3s ease-in forwards; }
+    @keyframes slideOut {
+      from { transform: translateX(0); }
+      to { transform: translateX(100%); }
+    }
+    @media (max-width: 768px) {
+      body { font-size: 14px; }
+      .header-buttons-text { display: none; }
+      .max-w-xl { max-width: 90vw; }
+    }
+    @media (max-width: 450px) {
+      .header-icon { padding: 0.5rem !important; margin: 0 0.15rem !important; }
+      .input-container { padding: 0.5rem !important; }
+      textarea { padding: 0.5rem !important; min-height: 42px !important; }
+    }
+    .xai-badge { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+    .markdown-content p, .markdown-content ul, .markdown-content ol, .markdown-content li, .markdown-content h1, .markdown-content h2, .markdown-content h3, .markdown-content blockquote {
+        unicode-bidi: plaintext;
+        text-align: start;
+    }
+    .markdown-content p { margin-bottom: 0.5rem; }
+    .markdown-content p:last-child { margin-bottom: 0; }
+    .markdown-content ul { list-style-type: disc; margin-right: 1.5rem; margin-bottom: 0.5rem; }
+    .markdown-content ol { list-style-type: decimal; margin-right: 1.5rem; margin-bottom: 0.5rem; }
+    .markdown-content code { background-color: rgba(0,0,0,0.1); padding: 0.1rem 0.3rem; border-radius: 4px; font-family: monospace; direction: ltr; unicode-bidi: embed; }
+    .markdown-content pre { background-color: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 0.5rem 0; direction: ltr; text-align: left; }
+    .markdown-content pre code { background: none; padding: 0; color: inherit; }
+    .markdown-content h1, .markdown-content h2, .markdown-content h3 { font-weight: bold; margin-top: 1rem; }
+    .markdown-content blockquote { border-right: 4px solid #c7d2fe; padding-right: 1rem; color: #4b5563; font-style: italic; }
+    .markdown-content table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; }
+    .markdown-content th, .markdown-content td { border: 1px solid #e5e7eb; padding: 0.5rem; text-align: start; }
+    .markdown-content th { background-color: #f3f4f6; }
+  </style>
+  <link rel="stylesheet" href="/i18n.css" />
+</head>
+<body class="h-screen flex flex-col bg-gray-50 text-gray-800">
+  <!-- Header -->
+  <header class="bg-white border-b p-2 md:p-4 flex justify-between items-center shadow-sm">
+    <div class="flex items-center gap-2">
+      <i class="fas fa-robot bg-indigo-600 text-white p-2 rounded-lg"></i>
+      <h1 class="font-bold text-lg">AI Assistant</h1>
+      <span id="activeModelBadge" class="text-xs bg-gray-200 px-2 py-1 rounded"></span>
+    </div>
+      <div class="flex gap-1 md:gap-2">
+      <div data-language-toggle></div>
+      <select data-i18n-aria-label="speech.language" data-i18n-title="speech.language" id="languageSelect" class="border rounded p-1 bg-white focus:ring-2 focus:ring-indigo-200 text-xs md:text-base">
+        <option value="he-IL" data-i18n="ui.hebrew">Hebrew</option>
+        <option value="en-US" selected>English</option>
+      </select>
+      
+      <button id="modelBtn" data-i18n-aria-label="common.model" class="header-icon bg-violet-100 hover:bg-violet-200 px-2 md:px-3 py-1 rounded flex gap-1 items-center transition-colors">
+        <i class="fas fa-microchip"></i><span class="header-buttons-text"><span data-i18n="common.model">Model</span></span>
+      </button>
+      <a href="/voice-chat.html" data-i18n-aria-label="common.voiceChat" class="header-icon bg-green-100 hover:bg-green-200 px-2 md:px-3 py-1 rounded flex gap-1 items-center transition-colors">
+        <i class="fas fa-headset"></i><span class="header-buttons-text"><span data-i18n="common.voiceChat">Voice chat</span></span>
+      </a>
+      <button id="historyBtn" data-i18n-aria-label="common.history" class="header-icon bg-indigo-100 hover:bg-indigo-200 px-2 md:px-3 py-1 rounded flex gap-1 items-center transition-colors">
+        <i class="fas fa-history"></i><span class="header-buttons-text"><span data-i18n="common.history">History</span></span>
+      </button>
+      <button id="settingsBtn" data-i18n-aria-label="common.settings" class="header-icon bg-gray-100 hover:bg-gray-200 px-2 md:px-3 py-1 rounded flex gap-1 items-center transition-colors">
+        <i class="fas fa-cog"></i><span class="header-buttons-text"><span data-i18n="common.settings">Settings</span></span>
+      </button>
+      <a href="/admin" class="header-icon bg-yellow-100 hover:bg-yellow-200 px-2 md:px-3 py-1 rounded flex gap-1 items-center transition-colors" data-i18n-title="admin.title" title="System administration">
+        <i class="fas fa-tools"></i><span class="header-buttons-text"><span data-i18n="common.admin">Admin</span></span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Chat area -->
+  <main class="flex-1 flex flex-col relative">
+    <div id="messages" class="flex-1 p-3 md:p-6 space-y-4 md:space-y-6 overflow-y-auto custom"></div>
+    <!-- Loading indicator -->
+    <div id="loadingIndicator" class="hidden px-3 md:px-6 pb-4">
+      <div class="flex gap-2 max-w-xl">
+        <i class="fas fa-robot w-8 h-8 p-2 bg-indigo-100 text-indigo-600 rounded-full"></i>
+        <div class="bg-gray-100 rounded p-3 flex-1 flex items-center gap-2">
+          <div class="w-3 h-3 rounded-full bg-indigo-400 pulse"></div>
+          <div class="w-3 h-3 rounded-full bg-indigo-400 pulse" style="animation-delay: 0.2s"></div>
+          <div class="w-3 h-3 rounded-full bg-indigo-400 pulse" style="animation-delay: 0.4s"></div>
+        </div>
+      </div>
+    </div>
+    <!-- Input form -->
+    <form id="chatForm" class="border-t bg-white p-2 md:p-4 flex gap-2 items-end input-container">
+      <textarea id="msgInput" dir="auto" data-i18n-aria-label="chat.placeholder" rows="5" data-i18n-placeholder="chat.placeholder" placeholder="Type a message..." class="flex-1 border rounded-lg resize-none px-3 py-2 text-sm md:text-base focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all"></textarea>
+      <button id="micBtn" data-i18n-aria-label="mic.off" type="button" class="header-icon bg-red-600 hover:bg-red-700 text-white px-2 md:px-3 py-1 rounded flex gap-1 items-center transition-colors">
+        <i class="fas fa-microphone-slash"></i><span class="header-buttons-text"><span data-i18n="mic.off">Microphone off</span></span>
+      </button>
+      <label for="imageInput" data-i18n-title="chat.attach" class="text-indigo-600 text-xl cursor-pointer hover:text-indigo-800 transition-colors">
+        <i class="fas fa-image"></i>
+      </label>
+      <input id="imageInput" data-i18n-aria-label="chat.attach" type="file" accept="image/*" class="hidden" />
+      <button type="submit" id="sendBtn" data-i18n-aria-label="chat.send" class="text-indigo-600 text-xl hover:text-indigo-800 transition-colors">
+        <i class="fas fa-paper-plane"></i>
+      </button>
+    </form>
+
+    <!-- History sidebar -->
+    <div id="historySidebar" class="hidden fixed inset-y-0 right-0 w-full sm:w-80 bg-white shadow-lg z-30 border-l overflow-hidden flex flex-col">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h2 class="font-bold"><span data-i18n="history.title">Conversation history</span></h2>
+        <button id="closeHistoryBtn" data-i18n-aria-label="common.close" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="overflow-y-auto flex-1 custom">
+        <div id="conversationsList" class="divide-y">
+          <div class="p-4 text-center text-gray-500">
+            <i class="fas fa-spinner fa-spin"></i> <span data-i18n="history.loading">Loading conversations...</span>
+          </div>
+        </div>
+      </div>
+      <div class="p-2 border-t bg-gray-50">
+        <button id="newChatBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded flex justify-center items-center gap-2 transition-colors">
+          <i class="fas fa-plus"></i> <span data-i18n="history.new">New conversation</span>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- TTS settings modal -->
+  <div id="modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white max-w-md w-full mx-auto p-4 md:p-6 rounded-lg shadow-xl space-y-4">
+      <h3 class="font-bold text-lg flex items-center gap-2">
+        <i class="fas fa-volume-up text-indigo-600"></i>
+        <span><span data-i18n="tts.settings">Text-to-speech settings</span></span>
+      </h3>
+      <div class="flex border-b">
+        <button id="openaiTab" class="tab-button active px-4 py-2 font-medium">OpenAI</button>
+        <button id="elevenlabsTab" class="tab-button px-4 py-2 font-medium">ElevenLabs</button>
+        <button id="windowsTab" class="tab-button px-4 py-2 font-medium">Windows</button>
+      </div>
+      <!-- OpenAI settings -->
+      <div id="openaiSettings" class="space-y-4">
+        <label class="flex gap-2 items-center">
+          <span class="w-20"><span data-i18n="tts.voice">Voice:</span></span>
+          <select id="ttsVoice" class="flex-1 border rounded p-2 focus:ring-2 focus:ring-indigo-200">
+            <option value="alloy">Alloy</option>
+            <option value="nova">Nova</option>
+            <option value="onyx">Onyx</option>
+            <option value="echo">Echo</option>
+          </select>
+        </label>
+        <label class="flex gap-2 items-center">
+          <span class="w-20"><span data-i18n="tts.speed">Speed:</span></span>
+          <input id="ttsSpeed" type="range" min="0.5" max="2" step="0.1" value="1" class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+          <span id="speedValue" class="w-8 text-center">1</span>
+        </label>
+      </div>
+      <!-- ElevenLabs settings -->
+      <div id="elevenlabsSettings" class="space-y-4 hidden">
+        <label class="flex gap-2 items-center">
+          <span class="w-20"><span data-i18n="tts.voice">Voice:</span></span>
+          <select id="elevenlabsVoice" class="flex-1 border rounded p-2 focus:ring-2 focus:ring-indigo-200">
+            <option value="pNInz6obpgDQGcFmaJgB">Adam (EN)</option>
+            <option value="EXAVITQu4vr4xnSDxMaL">Bella (EN)</option>
+            <option value="VR6AewLTigWG4xSOukaG">Arnold (EN)</option>
+            <option value="MF3mGyEYCl7XYWbV9V6O">Elli (EN)</option>
+            <option value="TxGEqnHWrfWFTfGW9XjX">Josh (EN)</option>
+            <option value="21m00Tcm4TlvDq8ikWAM">Rachel (EN)</option>
+          </select>
+        </label>
+        <label class="flex gap-2 items-center">
+          <span class="w-20"><span data-i18n="common.modelLabel">Model:</span></span>
+          <select id="elevenlabsModel" class="flex-1 border rounded p-2 focus:ring-2 focus:ring-indigo-200">
+            <option value="eleven_monolingual_v1">Monolingual V1</option>
+            <option value="eleven_multilingual_v2">Multilingual V2</option>
+          </select>
+        </label>
+      </div>
+      <!-- Windows TTS settings -->
+      <div id="windowsSettings" class="space-y-4 hidden">
+        <label class="flex gap-2 items-center">
+          <span class="w-20"><span data-i18n="tts.voice">Voice:</span></span>
+          <select id="windowsVoice" class="flex-1 border rounded p-2 focus:ring-2 focus:ring-indigo-200">
+            <option value="" data-i18n="tts.loading">Loading voices...</option>
+          </select>
+          <button id="refreshVoices" data-i18n-aria-label="tts.refresh" class="p-2 text-gray-600 hover:text-indigo-600 rounded-full hover:bg-gray-100">
+            <i class="fas fa-sync-alt"></i>
+          </button>
+        </label>
+        <label class="flex gap-2 items-center">
+          <span class="w-20"><span data-i18n="tts.speed">Speed:</span></span>
+          <input id="windowsSpeed" type="range" min="0.5" max="2" step="0.1" value="1" class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+          <span id="windowsSpeedValue" class="w-8 text-center">1</span>
+        </label>
+      </div>
+      <div class="flex items-center gap-2 p-2 bg-gray-50 rounded">
+        <input type="checkbox" id="ttsEnabled" class="rounded text-indigo-600 focus:ring-indigo-200">
+        <label for="ttsEnabled" class="cursor-pointer"><span data-i18n="tts.enable">Enable text-to-speech</span></label>
+      </div>
+      <div class="flex justify-end space-x-2 pt-2">
+        <button id="cancel" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"><span data-i18n="common.cancel">Cancel</span></button>
+        <button id="save" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"><span data-i18n="common.save">Save</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Model selection modal -->
+  <div id="modelModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white max-w-md w-full mx-auto p-4 md:p-6 rounded-lg shadow-xl space-y-4">
+      <h3 class="font-bold text-lg flex items-center gap-2">
+        <i class="fas fa-microchip text-violet-600"></i>
+        <span><span data-i18n="models.select">Select model</span></span>
+      </h3>
+      <div class="space-y-4">
+        <p class="text-gray-600 text-sm"><span data-i18n="models.help">Choose the model used to generate responses</span></p>
+        <div class="space-y-2">
+          <h4 class="font-medium"><span data-i18n="models.provider">Provider:</span></h4>
+          <div class="flex gap-2">
+            <button id="providerOllama" class="provider-btn flex-1 p-2 border-2 border-indigo-600 text-indigo-600 rounded hover:bg-indigo-50">
+              <i class="fas fa-server"></i> <span data-i18n="models.ollama">Ollama (local)</span>
+            </button>
+            <button id="providerXAI" class="provider-btn flex-1 p-2 border-2 border-gray-300 rounded hover:bg-gray-50">
+              <i class="fas fa-cloud"></i> XAI (Grok)
+            </button>
+          </div>
+        </div>
+        <div id="ollamaSettings" class="space-y-2">
+          <h4 class="font-medium"><span data-i18n="models.text">Text model (chat):</span></h4>
+          <div class="relative">
+            <select id="textModelSelect" class="w-full border rounded p-2 focus:ring-2 focus:ring-violet-200">
+              <option value="" data-i18n="models.loading">Loading models...</option>
+            </select>
+            <button id="refreshModelsBtn" class="absolute left-2 top-2 p-1 text-gray-600 hover:text-violet-600 rounded-full hover:bg-gray-100" data-i18n-title="models.refresh" title="Refresh models">
+              <i class="fas fa-sync-alt text-sm"></i>
+            </button>
+          </div>
+          <h4 class="font-medium"><span data-i18n="models.image">Multimodal model (images):</span></h4>
+          <select id="imageModelSelect" class="w-full border rounded p-2 focus:ring-2 focus:ring-violet-200">
+            <option value="" data-i18n="models.loading">Loading models...</option>
+          </select>
+        </div>
+        <div id="xaiSettings" class="space-y-2 hidden">
+          <div class="p-3 bg-purple-50 rounded">
+            <p class="text-sm"><i class="fas fa-info-circle text-purple-600"></i> <span data-i18n="models.xaiHelp">Uses XAI's advanced Grok-2 model</span></p>
+          </div>
+        </div>
+        <div id="modelDetails" class="hidden p-3 bg-gray-50 rounded text-sm">
+          <div class="grid grid-cols-2 gap-2">
+            <div><span class="font-medium"><span data-i18n="models.size">Size:</span></span> <span id="modelSize"></span></div>
+            <div><span class="font-medium"><span data-i18n="models.params">Parameters:</span></span> <span id="modelParams"></span></div>
+            <div><span class="font-medium"><span data-i18n="models.family">Family:</span></span> <span id="modelFamily"></span></div>
+            <div><span class="font-medium"><span data-i18n="models.quantization">Quantization:</span></span> <span id="modelQuantization"></span></div>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end space-x-2 pt-2">
+        <button id="cancelModelSelection" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"><span data-i18n="common.cancel">Cancel</span></button>
+        <button id="saveModelSelection" class="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors"><span data-i18n="common.save">Save</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete confirmation modal -->
+  <div id="deleteModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm mx-auto p-6 rounded-lg shadow-xl">
+      <h3 class="font-bold text-lg mb-4"><span data-i18n="history.delete">Delete conversation</span></h3>
+      <p class="mb-6"><span data-i18n="history.deleteConfirm">Permanently delete this conversation?</span></p>
+      <div class="flex justify-end gap-2">
+        <button id="cancelDelete" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded transition-colors"><span data-i18n="common.cancel">Cancel</span></button>
+        <button id="confirmDelete" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"><span data-i18n="common.delete">Delete</span></button>
+      </div>
+    </div>
+  </div>
+  
+    <!-- Screen Assistant widget -->
+  <div id="screenAssistant" class=" bg-white p-3 rounded shadow-lg  z-40">
+    <div class="flex justify-between items-center mb-2">
+      <strong data-i18n="screen.title">Screen assistant</strong>
+      <div class="text-xs text-gray-500"><span data-i18n="screen.engine">Analysis engine determined by:</span></div>
+    </div>
+    <div class="flex gap-2 items-center mb-2">
+      <button id="shareBtn" class="w-1/2 bg-indigo-600 text-white py-1 rounded"><span data-i18n="screen.share">Share screen</span></button>
+      <button id="stopShareBtn" class="w-1/2 bg-red-600 text-white py-1 rounded hidden"><span data-i18n="common.stop">Stop</span></button>
+    </div>
+    <div class="flex gap-2 items-center">
+      <button id="snapBtn" class="flex-1 bg-gray-100 py-1 rounded disabled:opacity-50" disabled><span data-i18n="screen.capture">Capture and ask</span></button>
+      <button id="openModelSelect" class="ml-2 text-sm text-indigo-600"><span data-i18n="screen.selectModel">Choose model</span></button>
+    </div>
+    <div class="mt-2 flex items-center justify-between gap-2">
+      <label class="flex items-center gap-2 text-sm">
+        <input id="continuousChatToggle" type="checkbox" class="form-checkbox h-4 w-4 text-indigo-600" />
+        <span><span data-i18n="screen.continuous">Continuous chat while sharing your screen</span></span>
+      </label>
+      <div id="continuousStatus" class="text-xs text-gray-500"><span data-i18n="common.off">Off</span></div>
+    </div>
+    <div id="placeholder" class="mt-2 text-sm text-gray-500 text-center"><span data-i18n="screen.inactive">Screen sharing is inactive</span></div>
+    <video id="screenVideo" autoplay muted playsinline style="display:none;width:100%;margin-top:8px;border-radius:4px;"></video>
+    <canvas id="screenCanvas" style="display:none;width:100%;margin-top:8px;border-radius:4px;"></canvas>
+  </div>
+
+  <!-- Main application script -->
+  <script>
+    /* ---------- GLOBAL ---------- */
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    {
+      const rec = SR ? new SR() : { start() {}, stop() {} };
+      rec.continuous = true;
+      rec.interimResults = false;
+      let recActive = false;
+      // DOM references
+      const micBtn = document.getElementById('micBtn');
+      const messages = document.getElementById('messages');
+      const msgInput = document.getElementById('msgInput');
+      const modal = document.getElementById('modal');
+      const settingsBtn = document.getElementById('settingsBtn');
+      const cancel = document.getElementById('cancel');
+      const save = document.getElementById('save');
+      const ttsVoice = document.getElementById('ttsVoice');
+      const ttsSpeed = document.getElementById('ttsSpeed');
+      const speedValue = document.getElementById('speedValue');
+      const windowsVoice = document.getElementById('windowsVoice');
+      const windowsSpeed = document.getElementById('windowsSpeed');
+      const windowsSpeedValue = document.getElementById('windowsSpeedValue');
+      const ttsEnabled = document.getElementById('ttsEnabled');
+      const openaiTab = document.getElementById('openaiTab');
+      const windowsTab = document.getElementById('windowsTab');
+      const elevenlabsTab = document.getElementById('elevenlabsTab');
+      const openaiSettings = document.getElementById('openaiSettings');
+      const elevenlabsSettings = document.getElementById('elevenlabsSettings');
+      const windowsSettings = document.getElementById('windowsSettings');
+      const refreshVoices = document.getElementById('refreshVoices');
+      const imageInput = document.getElementById('imageInput');
+      const languageSelect = document.getElementById('languageSelect');
+      const loadingIndicator = document.getElementById('loadingIndicator');
+      const sendBtn = document.getElementById('sendBtn');
+      const elevenlabsVoice = document.getElementById('elevenlabsVoice');
+      const elevenlabsModel = document.getElementById('elevenlabsModel');
+      const activeModelBadge = document.getElementById('activeModelBadge');
+      // Model selection elements
+      const modelBtn = document.getElementById('modelBtn');
+      const modelModal = document.getElementById('modelModal');
+      const textModelSelect = document.getElementById('textModelSelect');
+      const imageModelSelect = document.getElementById('imageModelSelect');
+      const saveModelSelection = document.getElementById('saveModelSelection');
+      const cancelModelSelection = document.getElementById('cancelModelSelection');
+      const refreshModelsBtn = document.getElementById('refreshModelsBtn');
+      const providerOllama = document.getElementById('providerOllama');
+      const providerXAI = document.getElementById('providerXAI');
+      const ollamaSettings = document.getElementById('ollamaSettings');
+      const xaiSettings = document.getElementById('xaiSettings');
+      // Conversation history elements
+      const historyBtn = document.getElementById('historyBtn');
+      const historySidebar = document.getElementById('historySidebar');
+      const closeHistoryBtn = document.getElementById('closeHistoryBtn');
+      const conversationsList = document.getElementById('conversationsList');
+      const newChatBtn = document.getElementById('newChatBtn');
+      const deleteModal = document.getElementById('deleteModal');
+      const cancelDelete = document.getElementById('cancelDelete');
+      const confirmDelete = document.getElementById('confirmDelete');
+      micBtn.disabled = !SR;
+      // State
+      let tts = JSON.parse(localStorage.getItem('tts') || '{"engine":"openai","voice":"alloy","speed":1,"enabled":true,"elevenlabsVoice":"pNInz6obpgDQGcFmaJgB","elevenlabsModel":"eleven_monolingual_v1"}');
+      let lastAssistantMessage = null;
+      let isWaitingForResponse = false;
+      let modelSettings = JSON.parse(localStorage.getItem('modelSettings') || '{"provider":"ollama","textModel":"","imageModel":""}');
+      let currentConversationId = null;
+      let conversationToDelete = null;
+      let availableModels = [];
+      // Set speech recognition language
+      rec.lang = languageSelect.value;
+      languageSelect.onchange = () => {
+        rec.lang = languageSelect.value;
+        console.log(`Recognition language changed to: ${rec.lang}`);
+      };
+      /* ---------- UI Helpers ---------- */
+      function adjustTextareaHeight() {
+        msgInput.style.height = 'auto';
+        msgInput.style.height = msgInput.scrollHeight + 'px';
+      }
+      msgInput.addEventListener('input', adjustTextareaHeight);
+      window.addEventListener('resize', adjustTextareaHeight);
+      // Update active model badge
+      function updateActiveModelBadge() {
+        if (modelSettings.provider === 'xai') {
+          I18n.setText(activeModelBadge, '');
+          activeModelBadge.innerHTML = '<span class="xai-badge">XAI Grok</span>';
+        } else if (modelSettings.textModel) {
+          I18n.setText(activeModelBadge, modelSettings.textModel);
+        } else {
+          I18n.setText(activeModelBadge, I18n.message('models.noneSelected'));
+        }
+      }
+      // Append a message to the chat
+      const addMsg = (role, txt, imageBase64 = null) => {
+        const div = document.createElement('div');
+        div.className = 'fade-in flex ' + (role === 'user' ? 'justify-end' : '');
+        if (role === 'assistant') {
+          lastAssistantMessage = I18n.resolve(txt);
+        }
+        const isUiMessage = txt && typeof txt === 'object' && txt.key;
+        const processedTxt = isUiMessage ? I18n.html(txt)
+          : role === 'assistant' && typeof marked !== 'undefined'
+            ? marked.parse(txt) : I18n.escapeHtml(txt);
+        if (role === 'user' && imageBase64) {
+          div.innerHTML = `<div class="bg-indigo-600 text-white rounded-lg p-3 max-w-xl shadow"><img src="${imageBase64}" data-i18n-alt="chat.sentImage" alt="Sent image" class="max-w-full rounded mb-2" />${txt ? `<p data-user-content dir="auto">${I18n.escapeHtml(txt)}</p>` : ''}</div>`;
+        } else if (role === 'error') {
+          div.innerHTML = `<div class="error-message max-w-xl rounded-lg shadow"><div class="flex items-center gap-2"><i class="fas fa-exclamation-circle"></i> ${processedTxt}</div></div>`;
+        } else {
+          div.innerHTML = role === 'user'
+            ? `<div class="bg-indigo-600 text-white rounded-lg p-3 max-w-xl shadow text-sm md:text-base" data-user-content dir="auto">${processedTxt}</div>`
+            : `<div class="flex gap-2 max-w-xl"><i class="fas fa-robot w-8 h-8 p-2 bg-indigo-100 text-indigo-600 rounded-full"></i><div class="bg-gray-100 rounded-lg p-3 flex-1 shadow text-sm md:text-base"><div class="markdown-content" ${isUiMessage ? '' : 'data-user-content dir="auto"'}>${processedTxt}</div><div class="mt-2 text-xs text-gray-500 flex justify-end"><button data-i18n-title="tts.replay" data-i18n-aria-label="tts.replay" class="replay-btn p-1 text-gray-500 hover:text-indigo-600 rounded-full hover:bg-gray-200"><i class="fas fa-redo"></i></button></div></div></div>`;
+        }
+        I18n.apply(div);
+        messages.appendChild(div);
+        messages.scrollTop = messages.scrollHeight;
+        const replayBtn = div.querySelector('.replay-btn');
+        if (replayBtn) {
+          replayBtn.onclick = () => {
+            if (role === 'assistant' && tts.enabled) {
+              playTTS(I18n.resolve(txt));
+            }
+          };
+        }
+      };
+      if (!SR) addMsg('system', I18n.message('speech.unsupported'));
+      function toggleMic(on) {
+        recActive = on;
+        micBtn.setAttribute('data-i18n-aria-label', on ? 'mic.recording' : 'mic.off');
+        I18n.apply(micBtn);
+        micBtn.classList.toggle('bg-red-600', !on);
+        micBtn.classList.toggle('bg-green-600', on);
+        micBtn.querySelector('i').className = on ? 'fas fa-microphone' : 'fas fa-microphone-slash';
+        if (document.querySelector('.header-buttons-text')) {
+          I18n.setText(micBtn.querySelector('.header-buttons-text'), on ? I18n.message('mic.recording') : I18n.message('mic.off'));
+        }
+      }
+      function showLoading() {
+        isWaitingForResponse = true;
+        loadingIndicator.classList.remove('hidden');
+        messages.scrollTop = messages.scrollHeight;
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+      }
+      function hideLoading() {
+        isWaitingForResponse = false;
+        loadingIndicator.classList.add('hidden');
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+      }
+      /* ---------- VOICE RECOGNITION (Web Speech API) ---------- */
+      micBtn.onclick = () => {
+        if (recActive) {
+          rec.stop();
+          toggleMic(false);
+        } else {
+          // Request microphone permission implicitly by starting recognition
+          try {
+            rec.start();
+            toggleMic(true);
+          } catch (err) {
+            console.error('Failed to start speech recognition:', err);
+            addMsg('error', I18n.message('speech.startError', { detail: I18n.errorDetail(err) }));
+          }
+        }
+      };
+      rec.onresult = (event) => {
+        const last = event.results.length - 1;
+        const transcript = event.results[last][0].transcript.trim();
+        if (transcript) {
+          addMsg('user', transcript);
+          // Automatically send to chat (like the old Whisper flow)
+          if (!isWaitingForResponse) {
+            showLoading();
+            sendToChat(transcript).finally(() => hideLoading());
+          } else {
+            // If already waiting, just show but don't send? We'll still send and queue.
+            sendToChat(transcript);
+          }
+        }
+      };
+      rec.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        addMsg('error', I18n.message('speech.error', { detail: event.error }));
+        if (recActive) {
+          rec.stop();
+          toggleMic(false);
+        }
+      };
+      rec.onend = () => {
+        if (recActive) {
+          // Recognition stopped unexpectedly but we still want it active? We'll set to false.
+          toggleMic(false);
+        }
+      };
+      /* ---------- MODEL SELECTION FUNCTIONS ---------- */
+      async function loadModelsFromOllama() {
+        try {
+          textModelSelect.innerHTML = '<option value="" data-i18n="models.loading">Loading models...</option>';
+          imageModelSelect.innerHTML = '<option value="" data-i18n="models.loading">Loading models...</option>';
+          const response = await fetch('/api/tags');
+          if (!response.ok) throw I18n.error('models.unreachable');
+          const data = await response.json();
+          availableModels = data.models || [];
+          textModelSelect.innerHTML = '';
+          imageModelSelect.innerHTML = '';
+          if (availableModels.length === 0) {
+            textModelSelect.innerHTML = '<option value="" data-i18n="models.none">No installed models found</option>';
+            imageModelSelect.innerHTML = '<option value="" data-i18n="models.none">No installed models found</option>';
+            return;
+          }
+          availableModels.forEach(model => {
+            const option1 = document.createElement('option');
+            option1.value = model.name;
+            option1.textContent = model.name;
+            option1.setAttribute('data-details', JSON.stringify(model));
+            textModelSelect.appendChild(option1);
+            const option2 = document.createElement('option');
+            option2.value = model.name;
+            option2.textContent = model.name;
+            option2.setAttribute('data-details', JSON.stringify(model));
+            imageModelSelect.appendChild(option2);
+          });
+          if (modelSettings.textModel) {
+            textModelSelect.value = modelSettings.textModel;
+            updateModelDetails(modelSettings.textModel);
+          }
+          if (modelSettings.imageModel) {
+            imageModelSelect.value = modelSettings.imageModel;
+          }
+        } catch (error) {
+          console.error('שגיאה בטעינת מודלים:', error);
+          textModelSelect.replaceChildren(new Option('', ''));
+          I18n.setText(textModelSelect.options[0], I18n.message('common.errorDetail', { detail: I18n.errorDetail(error) }));
+          imageModelSelect.replaceChildren(new Option('', ''));
+          I18n.setText(imageModelSelect.options[0], I18n.message('common.errorDetail', { detail: I18n.errorDetail(error) }));
+        }
+      }
+      function updateModelDetails(modelName) {
+        const modelDetails = document.getElementById('modelDetails');
+        const modelSize = document.getElementById('modelSize');
+        const modelParams = document.getElementById('modelParams');
+        const modelFamily = document.getElementById('modelFamily');
+        const modelQuantization = document.getElementById('modelQuantization');
+        const model = availableModels.find(m => m.name === modelName);
+        if (!model) {
+          modelDetails.classList.add('hidden');
+          return;
+        }
+        modelSize.textContent = formatBytes(model.size);
+        I18n.setText(modelParams, model.details?.parameter_size || I18n.message('common.unavailable'));
+        I18n.setText(modelFamily, model.details?.family || I18n.message('common.unavailable'));
+        I18n.setText(modelQuantization, model.details?.quantization_level || I18n.message('common.unavailable'));
+        modelDetails.classList.remove('hidden');
+      }
+      function formatBytes(bytes) {
+        if (!bytes) return '0 B';
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+      }
+      // Provider selection buttons
+      providerOllama.onclick = () => {
+        providerOllama.classList.add('border-indigo-600', 'text-indigo-600');
+        providerOllama.classList.remove('border-gray-300');
+        providerXAI.classList.remove('border-indigo-600', 'text-indigo-600');
+        providerXAI.classList.add('border-gray-300');
+        ollamaSettings.classList.remove('hidden');
+        xaiSettings.classList.add('hidden');
+        loadModelsFromOllama();
+      };
+      providerXAI.onclick = () => {
+        providerXAI.classList.add('border-indigo-600', 'text-indigo-600');
+        providerXAI.classList.remove('border-gray-300');
+        providerOllama.classList.remove('border-indigo-600', 'text-indigo-600');
+        providerOllama.classList.add('border-gray-300');
+        xaiSettings.classList.remove('hidden');
+        ollamaSettings.classList.add('hidden');
+      };
+      /* ---------- TTS ---------- */
+      async function playTTS(text, delay = 25) {
+        if (!tts.enabled) return;
+        try {
+          rec.stop();
+          const cleanedText = (typeof text === 'string') ? text.replace(/[*#<>]/g, '').replace(/\s\s+/g, ' ').trim() : text;
+          if (tts.engine === 'openai') {
+            const r = await fetch('/tts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: cleanedText, voice: tts.voice, speed: tts.speed })
+            });
+            if (!r.ok) {
+              const error = await r.json();
+              throw error.error ? new Error(error.error) : I18n.error('tts.failed');
+            }
+            const audio = new Audio(URL.createObjectURL(await r.blob()));
+            audio.onended = () => {
+              setTimeout(() => { if (recActive) rec.start(); }, delay);
+            };
+            audio.play();
+          } else if (tts.engine === 'elevenlabs') {
+            const r = await fetch('/tts/elevenlabs', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: cleanedText, voice_id: tts.elevenlabsVoice, model_id: tts.elevenlabsModel })
+            });
+            if (!r.ok) {
+              const error = await r.json();
+              throw error.error ? new Error(error.error) : I18n.error('tts.elevenFailed');
+            }
+            const contentType = r.headers.get('content-type');
+            if (contentType && contentType.includes('audio')) {
+              const audio = new Audio(URL.createObjectURL(await r.blob()));
+              audio.onended = () => {
+                setTimeout(() => { if (recActive) rec.start(); }, delay);
+              };
+              audio.play();
+            } else {
+              console.log('Audio played locally via Python script');
+              setTimeout(() => { if (recActive) rec.start(); }, delay);
+            }
+          } else if (tts.engine === 'windows') {
+            const utterance = new SpeechSynthesisUtterance(cleanedText);
+            const voices = window.speechSynthesis.getVoices();
+            if (voices.length > 0 && tts.windowsVoice) {
+              utterance.voice = voices.find(v => v.voiceURI === tts.windowsVoice) || voices.find(v => v.lang === languageSelect.value) || voices[0];
+            }
+            utterance.rate = tts.speed;
+            utterance.onend = () => {
+              setTimeout(() => { if (recActive) rec.start(); }, delay);
+            };
+            window.speechSynthesis.speak(utterance);
+          }
+        } catch (e) {
+          console.error('TTS ❌', e.message);
+          addMsg('error', I18n.message('tts.error', { detail: I18n.errorDetail(e) }));
+          if (recActive) rec.start();
+        }
+      }
+      function loadWindowsVoices() {
+        const voiceSelect = document.getElementById('windowsVoice');
+        voiceSelect.innerHTML = '';
+        const voices = window.speechSynthesis.getVoices().filter(voice => voice.name.includes('Multilingual') || /^(he|en)(-|$)/i.test(voice.lang));
+        if (voices.length === 0) {
+          voiceSelect.innerHTML = '<option value="" data-i18n="tts.noVoices">No supported voices found</option>';
+          return;
+        }
+        voices.forEach(voice => {
+          const option = document.createElement('option');
+          option.value = voice.voiceURI;
+          option.textContent = `${voice.name} (${voice.lang})`;
+          voiceSelect.appendChild(option);
+        });
+        if (tts.engine === 'windows' && tts.windowsVoice) {
+          voiceSelect.value = tts.windowsVoice;
+        }
+      }
+      window.speechSynthesis.onvoiceschanged = loadWindowsVoices;
+      refreshVoices.onclick = loadWindowsVoices;
+      /* ---------- Model selection logic ---------- */
+      modelBtn.onclick = () => {
+        if (modelSettings.provider === 'ollama') {
+          loadModelsFromOllama();
+          providerOllama.click();
+        } else {
+          providerXAI.click();
+        }
+        modelModal.classList.remove('hidden');
+      };
+      cancelModelSelection.onclick = () => {
+        modelModal.classList.add('hidden');
+      };
+      saveModelSelection.onclick = () => {
+        if (xaiSettings.classList.contains('hidden')) {
+          modelSettings.provider = 'ollama';
+          modelSettings.textModel = textModelSelect.value;
+          modelSettings.imageModel = imageModelSelect.value;
+        } else {
+          modelSettings.provider = 'xai';
+          modelSettings.textModel = '';
+        }
+        localStorage.setItem('modelSettings', JSON.stringify(modelSettings));
+        modelModal.classList.add('hidden');
+        updateActiveModelBadge();
+        if (modelSettings.provider === 'xai') {
+          addMsg('system', I18n.message('models.xaiSelected'));
+        } else {
+          addMsg('system', I18n.message('models.selected', { name: modelSettings.textModel }));
+        }
+      };
+      refreshModelsBtn.onclick = (e) => {
+        e.preventDefault();
+        loadModelsFromOllama();
+      };
+      textModelSelect.addEventListener('change', (e) => {
+        updateModelDetails(e.target.value);
+      });
+      /* ---------- Chat Submission ---------- */
+      document.getElementById('chatForm').addEventListener('submit', async e => {
+        e.preventDefault();
+        const txt = msgInput.value.trim();
+        if (!txt || isWaitingForResponse) return;
+        addMsg('user', txt);
+        msgInput.value = '';
+        msgInput.style.height = 'auto';
+        showLoading();
+        await sendToChat(txt);
+        hideLoading();
+      });
+      async function sendToChat(prompt) {
+        try {
+          let endpoint = '/chat';
+          const body = { prompt, conversationId: currentConversationId };
+          if (modelSettings.provider === 'xai') {
+            endpoint = '/chat/xai';
+          } else {
+            body.model = modelSettings.textModel;
+          }
+          const r = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          if (!r.ok) {
+            const error = await r.json();
+            throw error.error ? new Error(error.error) : I18n.error('chat.sendFailed');
+          }
+          const data = await r.json();
+          addMsg('assistant', data.message || data.error || '❌');
+          if (data.conversationId) currentConversationId = data.conversationId;
+        } catch (e) {
+          console.error('Chat ❌', e.message);
+          addMsg('error', I18n.message('chat.sendError', { detail: I18n.errorDetail(e) }));
+        }
+      }
+      /* ---------- Image Handling ---------- */
+      imageInput.addEventListener('change', async (e) => {
+        const file = e.target?.files?.[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+          addMsg('error', I18n.message('image.tooLarge'));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          try {
+            const base64Image = event.target.result;
+            const imageData = base64Image.split(',')[1];
+            const userText = msgInput?.value?.trim() || '';
+            addMsg('user', userText || I18n.t('image.sent'), base64Image);
+            if (msgInput) {
+              msgInput.value = '';
+              if (typeof adjustTextareaHeight === 'function') adjustTextareaHeight();
+            }
+            if (typeof showLoading === 'function') showLoading();
+            let endpoint = '/chat';
+            let body = {
+              prompt: userText || I18n.t('image.describe'),
+              image: imageData,
+              conversationId: currentConversationId || null
+            };
+            if (modelSettings?.provider === 'xai') {
+              endpoint = '/chat/xai';
+              console.log('שולח תמונה ל-Grok (/chat/xai)');
+            } else if (modelSettings?.textModel) {
+              const visionCapable = [
+                'llava', 'bakllava', 'moondream', 'llava-phi', 'qwen-vl', 'qwen2-vl',
+                'llama-3.2-vision', 'llama3.2-vision', 'phi-3-vision', 'phi-3.5-vision',
+                'pixtral', 'idefics', 'kosmos', 'cogvlm', 'mm1', 'deepseek-vl', 'internvl',
+                'gemma3', 'gemma-3'
+              ];
+              const modelLower = modelSettings.textModel.toLowerCase();
+              const supportsVision = visionCapable.some(m => modelLower.includes(m));
+              if (!supportsVision) {
+                endpoint = '/image';
+                body = {
+                  image: imageData,
+                  prompt: userText || I18n.t('image.describeShort'),
+                  model: modelSettings.imageModel || undefined,
+                  conversationId: currentConversationId || null
+                };
+                console.log('Fallback ל-/image (מודל לא תומך vision)');
+              } else {
+                body.model = modelSettings.textModel;
+                console.log(`שולח תמונה למודל Ollama תומך vision: ${modelSettings.textModel}`);
+              }
+            }
+            console.log('Sending to:', endpoint, 'prompt length:', body.prompt.length, 'image length:', imageData.length);
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body)
+            });
+            if (!response.ok) {
+              let errMsg = I18n.t('image.httpError', { status: response.status });
+              try {
+                const errData = await response.json();
+                errMsg = errData.error || errMsg;
+              } catch {}
+              throw new Error(errMsg);
+            }
+            const data = await response.json();
+            addMsg('assistant', data.message || data.error || I18n.message('chat.invalidResponse'));
+            if (data.conversationId) currentConversationId = data.conversationId;
+          } catch (err) {
+            console.error('Image handling error:', err);
+            addMsg('error', I18n.message('image.error', { detail: I18n.errorDetail(err) }));
+          } finally {
+            if (typeof hideLoading === 'function') hideLoading();
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+      /* ---------- Conversation History ---------- */
+      historyBtn.onclick = () => {
+        historySidebar.classList.remove('hidden');
+        historySidebar.classList.add('slide-in');
+        loadConversations();
+      };
+      closeHistoryBtn.onclick = () => {
+        historySidebar.classList.add('slide-out');
+        setTimeout(() => {
+          historySidebar.classList.add('hidden');
+          historySidebar.classList.remove('slide-out');
+        }, 300);
+      };
+      async function loadConversations() {
+        try {
+          conversationsList.innerHTML = '<div class="p-4 text-center text-gray-500"><i class="fas fa-spinner fa-spin"></i> <span data-i18n="history.loading">Loading conversations...</span></div>';
+          const response = await fetch('/conversations');
+          if (!response.ok) throw I18n.error('history.loadFailed');
+          const data = await response.json();
+          const conversations = data.conversations || [];
+          if (conversations.length === 0) {
+            conversationsList.innerHTML = '<div class="p-4 text-center text-gray-500"><span data-i18n="history.empty">No saved conversations</span></div>';
+            return;
+          }
+          conversationsList.innerHTML = '';
+          conversations.forEach(conv => {
+            const date = new Date(conv.last_updated);
+            const formattedDate = I18n.formatDate(date);
+            const itemEl = document.createElement('div');
+            itemEl.className = 'p-3 hover:bg-gray-50 cursor-pointer flex items-center';
+            itemEl.innerHTML = `<div class="flex-1" data-id="${conv.conversation_id}"><div class="font-medium text-gray-900 truncate">${conv.first_message ? I18n.escapeHtml(conv.first_message) : I18n.html('history.new')}</div><div class="text-xs text-gray-500" data-i18n-date="${I18n.escapeHtml(date.toISOString())}">${formattedDate}</div></div><button data-i18n-aria-label="history.delete" class="delete-conv-btn p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-gray-100" data-id="${conv.conversation_id}"><i class="fas fa-trash-alt"></i></button>`;
+            const contentEl = itemEl.querySelector('div[data-id]');
+            contentEl.onclick = () => loadConversation(conv.conversation_id);
+            const deleteBtn = itemEl.querySelector('.delete-conv-btn');
+            deleteBtn.onclick = (ev) => {
+              ev.stopPropagation();
+              showDeleteConfirmation(conv.conversation_id);
+            };
+            conversationsList.appendChild(itemEl);
+          });
+        } catch (err) {
+          console.error('שגיאה בטעינת היסטוריית שיחות:', err);
+          conversationsList.innerHTML = `<div class="p-4 text-center text-red-500">${I18n.html('history.loadError', { detail: I18n.errorDetail(err) })}</div>`;
+        }
+      }
+      async function loadConversation(conversationId) {
+        try {
+          messages.innerHTML = '';
+          showLoading();
+          const response = await fetch(`/conversations/${conversationId}`);
+          if (!response.ok) throw I18n.error('history.conversationFailed');
+          const data = await response.json();
+          const messagesData = data.messages || [];
+          messagesData.forEach(msg => {
+            if (msg.role === 'user') {
+              if (msg.image_data) {
+                addMsg('user', msg.content, `data:image/jpeg;base64,${msg.image_data}`);
+              } else {
+                addMsg('user', msg.content);
+              }
+            } else {
+              addMsg('assistant', msg.content);
+            }
+          });
+          currentConversationId = conversationId;
+          closeHistoryBtn.click();
+        } catch (err) {
+          console.error('שגיאה בטעינת השיחה:', err);
+          addMsg('error', I18n.message('history.conversationError', { detail: I18n.errorDetail(err) }));
+        } finally {
+          hideLoading();
+        }
+      }
+      newChatBtn.onclick = () => {
+        messages.innerHTML = '';
+        currentConversationId = null;
+        closeHistoryBtn.click();
+      };
+      function showDeleteConfirmation(conversationId) {
+        conversationToDelete = conversationId;
+        deleteModal.classList.remove('hidden');
+      }
+      cancelDelete.onclick = () => {
+        deleteModal.classList.add('hidden');
+        conversationToDelete = null;
+      };
+      confirmDelete.onclick = async () => {
+        if (!conversationToDelete) return;
+        try {
+          const response = await fetch(`/conversations/${conversationToDelete}`, { method: 'DELETE' });
+          if (!response.ok) throw I18n.error('history.deleteFailed');
+          await loadConversations();
+          if (currentConversationId === conversationToDelete) {
+            messages.innerHTML = '';
+            currentConversationId = null;
+          }
+        } catch (err) {
+          console.error('שגיאה במחיקת השיחה:', err);
+          addMsg('error', I18n.message('history.deleteError', { detail: I18n.errorDetail(err) }));
+        } finally {
+          deleteModal.classList.add('hidden');
+          conversationToDelete = null;
+        }
+      };
+      /* ---------- Modal settings ---------- */
+      settingsBtn.onclick = () => {
+        modal.classList.remove('hidden');
+        ttsVoice.value = tts.voice;
+        ttsSpeed.value = tts.speed;
+        windowsSpeed.value = tts.speed;
+        ttsEnabled.checked = tts.enabled;
+        elevenlabsVoice.value = tts.elevenlabsVoice || 'pNInz6obpgDQGcFmaJgB';
+        elevenlabsModel.value = tts.elevenlabsModel || 'eleven_monolingual_v1';
+        if (tts.engine === 'openai') {
+          openaiTab.click();
+        } else if (tts.engine === 'elevenlabs') {
+          elevenlabsTab.click();
+        } else {
+          windowsTab.click();
+        }
+        if (tts.engine === 'windows') {
+          loadWindowsVoices();
+        }
+      };
+      cancel.onclick = () => modal.classList.add('hidden');
+      save.onclick = () => {
+        const activeTabId = document.querySelector('.tab-button.active').id;
+        if (activeTabId === 'openaiTab') {
+          tts.engine = 'openai';
+          tts.voice = ttsVoice.value;
+          tts.speed = +ttsSpeed.value;
+        } else if (activeTabId === 'elevenlabsTab') {
+          tts.engine = 'elevenlabs';
+          tts.elevenlabsVoice = elevenlabsVoice.value;
+          tts.elevenlabsModel = elevenlabsModel.value;
+        } else {
+          tts.engine = 'windows';
+          tts.windowsVoice = windowsVoice.value;
+          tts.speed = +windowsSpeed.value;
+        }
+        tts.enabled = ttsEnabled.checked;
+        localStorage.setItem('tts', JSON.stringify(tts));
+        modal.classList.add('hidden');
+      };
+      openaiTab.onclick = () => {
+        openaiTab.classList.add('active');
+        windowsTab.classList.remove('active');
+        elevenlabsTab.classList.remove('active');
+        openaiSettings.classList.remove('hidden');
+        elevenlabsSettings.classList.add('hidden');
+        windowsSettings.classList.add('hidden');
+      };
+      elevenlabsTab.onclick = () => {
+        elevenlabsTab.classList.add('active');
+        openaiTab.classList.remove('active');
+        windowsTab.classList.remove('active');
+        elevenlabsSettings.classList.remove('hidden');
+        openaiSettings.classList.add('hidden');
+        windowsSettings.classList.add('hidden');
+      };
+      windowsTab.onclick = () => {
+        windowsTab.classList.add('active');
+        openaiTab.classList.remove('active');
+        elevenlabsTab.classList.remove('active');
+        windowsSettings.classList.remove('hidden');
+        openaiSettings.classList.add('hidden');
+        elevenlabsSettings.classList.add('hidden');
+        loadWindowsVoices();
+      };
+      ttsSpeed.oninput = () => speedValue.textContent = ttsSpeed.value;
+      windowsSpeed.oninput = () => windowsSpeedValue.textContent = windowsSpeed.value;
+      if (tts.engine === 'windows') {
+        windowsSpeed.value = tts.speed;
+        windowsSpeedValue.textContent = tts.speed;
+      } else {
+        ttsSpeed.value = tts.speed;
+        speedValue.textContent = tts.speed;
+      }
+      if (window.speechSynthesis) {
+        loadWindowsVoices();
+      }
+      // Initial setup
+      updateActiveModelBadge();
+      if (modelSettings.provider === 'ollama' && modelSettings.textModel) {
+        loadModelsFromOllama();
+      }
+    }
+  </script>
+
+
+
+  <script>
+    // Helper to append system-style messages into the chat area
+    function addSystemMessage(txt) {
+      try {
+        const messages = document.getElementById('messages');
+        const div = document.createElement('div');
+        div.className = 'fade-in flex';
+        div.innerHTML = `<div class="flex gap-2 max-w-xl"><i class="fas fa-robot w-8 h-8 p-2 bg-indigo-100 text-indigo-600 rounded-full"></i><div class="bg-gray-100 rounded-lg p-3 flex-1 shadow text-sm md:text-base"><div class="markdown-content">${txt && typeof txt === 'object' && txt.key ? I18n.html(txt) : I18n.escapeHtml(txt)}</div></div></div>`;
+        messages.appendChild(div);
+        messages.scrollTop = messages.scrollHeight;
+      } catch (e) {
+        console.log('addSystemMessage:', txt);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════
+    // CONFIG
+    // ═══════════════════════════════════════════════════
+    let CONFIG = {
+      model: ''
+    };
+
+    // Load from localStorage
+    try {
+      const saved = JSON.parse(localStorage.getItem('screenAssistantConfig'));
+      if (saved) Object.assign(CONFIG, saved);
+    } catch(e) {}
+
+    // ═══════════════════════════════════════════════════
+    // STATE
+    // ═══════════════════════════════════════════════════
+    let screenStream = null;
+    let isAutoMode = false;
+    let autoInterval = null;
+    let isRecording = false;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let conversationHistory = [];
+    let isProcessing = false;
+    let currentAudio = null;
+
+    const video = document.getElementById('screenVideo');
+    const canvas = document.getElementById('screenCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // ═══════════════════════════════════════════════════
+    // SCREEN SHARING
+    // ═══════════════════════════════════════════════════
+    async function startScreenShare() {
+      try {
+        screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { cursor: 'always' },
+          audio: false
+        });
+        
+        video.srcObject = screenStream;
+        video.style.display = 'block';
+        canvas.style.display = 'none';
+        document.getElementById('placeholder').style.display = 'none';
+        
+        document.getElementById('shareBtn').style.display = 'none';
+        document.getElementById('stopShareBtn').style.display = 'flex';
+        document.getElementById('snapBtn').disabled = false;
+        
+        screenStream.getVideoTracks()[0].onended = () => stopScreenShare();
+        
+        addSystemMessage(I18n.message('screen.started'));
+      } catch(e) {
+        console.error('Screen share error:', e);
+        addSystemMessage(I18n.message('screen.startError', { detail: I18n.errorDetail(e) }));
+      }
+    }
+
+    function stopScreenShare() {
+      if (screenStream) {
+        screenStream.getTracks().forEach(t => t.stop());
+        screenStream = null;
+      }
+      video.srcObject = null;
+      video.style.display = 'none';
+      canvas.style.display = 'none';
+      document.getElementById('placeholder').style.display = 'flex';
+      document.getElementById('shareBtn').style.display = 'flex';
+      document.getElementById('stopShareBtn').style.display = 'none';
+      document.getElementById('snapBtn').disabled = true;
+      
+      if (isAutoMode) toggleAuto();
+      addSystemMessage(I18n.message('screen.stopped'));
+    }
+
+    // ═══════════════════════════════════════════════════
+    // CAPTURE SCREEN
+    // ═══════════════════════════════════════════════════
+    function captureScreen() {
+      if (!screenStream) return null;
+      
+      const track = screenStream.getVideoTracks()[0];
+      const settings = track.getSettings();
+      canvas.width = settings.width || video.videoWidth;
+      canvas.height = settings.height || video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      
+      // Show last frame
+      canvas.style.display = 'block';
+      
+      return canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+    }
+
+    function captureScreenThumbnail() {
+      if (!screenStream) return null;
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = 160;
+      tempCanvas.height = 90;
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCtx.drawImage(video, 0, 0, 160, 90);
+      return tempCanvas.toDataURL('image/jpeg', 0.5);
+    }
+
+    // Hook up UI buttons
+    document.getElementById('shareBtn').onclick = startScreenShare;
+    document.getElementById('stopShareBtn').onclick = stopScreenShare;
+    document.getElementById('snapBtn').onclick = async () => {
+      const b64 = captureScreen();
+      if (!b64) { addSystemMessage(I18n.message('screen.noImage')); return; }
+      addSystemMessage(I18n.message('screen.analyzing'));
+      try {
+        const selectedModels = JSON.parse(localStorage.getItem('modelSettings') || '{}');
+        const imageModel = selectedModels.imageModel || selectedModels.textModel || CONFIG.model || undefined;
+        const resp = await fetch('/image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: b64, prompt: I18n.t('screen.describe'), model: imageModel })
+        });
+        const data = await resp.json();
+        if (data.message) addSystemMessage(I18n.message('screen.response', { text: data.message }));
+      } catch (err) {
+        console.error('capture send error', err);
+        addSystemMessage(I18n.message('screen.imageError', { detail: err.message || String(err) }));
+      }
+    };
+
+    // Open model modal so user can pick the image model (uses existing handler set by main script)
+    document.getElementById('openModelSelect').onclick = () => {
+      const btn = document.getElementById('modelBtn');
+      if (btn) btn.click();
+    };
+
+    // Continuous voice chat during screen sharing
+    let micStream = null;
+    let micRecorder = null;
+    let continuousEnabled = false;
+    const continuousToggle = document.getElementById('continuousChatToggle');
+    const continuousStatus = document.getElementById('continuousStatus');
+
+    async function startContinuousVoice() {
+      if (continuousEnabled) return;
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) {
+        addSystemMessage(I18n.message('screen.micError', { detail: I18n.errorDetail(e) }));
+        continuousToggle.checked = false;
+        return;
+      }
+      micRecorder = new MediaRecorder(micStream);
+      micRecorder.ondataavailable = async (ev) => {
+        if (!ev.data || ev.data.size === 0) return;
+        const blob = ev.data;
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const dataUrl = reader.result;
+          try {
+            const screenB64 = captureScreen();
+            const payload = { audio: dataUrl, language: (document.getElementById('languageSelect')?.value || 'en-US').split('-')[0] };
+            // If screen captured, include as image param to help context
+            if (screenB64) payload.screen = screenB64;
+            const r = await fetch('/voice', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            });
+            if (!r.ok) throw I18n.error('common.serverError');
+            const data = await r.json();
+            if (data.transcription) addSystemMessage(I18n.message('screen.heard', { text: data.transcription }));
+            if (data.response) addSystemMessage(I18n.message('screen.reply', { text: data.response }));
+            if (data.audio) {
+              const audio = new Audio(data.audio);
+              audio.play();
+            }
+          } catch (err) {
+            console.error('continuous send error', err);
+          }
+        };
+        reader.readAsDataURL(blob);
+      };
+      micRecorder.start(3000); // emit data every 3s
+      continuousEnabled = true;
+      I18n.setText(continuousStatus, I18n.message('common.active'));
+    }
+
+    function stopContinuousVoice() {
+      if (micRecorder && micRecorder.state !== 'inactive') {
+        try { micRecorder.stop(); } catch (e) {}
+      }
+      if (micStream) {
+        micStream.getTracks().forEach(t => t.stop());
+        micStream = null;
+      }
+      continuousEnabled = false;
+      I18n.setText(continuousStatus, I18n.message('common.off'));
+    }
+
+    continuousToggle.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        startContinuousVoice();
+      } else {
+        stopContinuousVoice();
+      }
+    });
+  </script>
+</body>
+</html>

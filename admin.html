@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <script src="/i18n.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title data-i18n="admin.pageTitle">Administration - AI Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Heebo', sans-serif; }
+    :root {
+      --bg-primary: #0f1117;
+      --bg-secondary: #1a1d2e;
+      --bg-card: #222640;
+      --bg-input: #2a2f4a;
+      --accent: #6c5ce7;
+      --accent-light: #a29bfe;
+      --accent-glow: rgba(108, 92, 231, 0.3);
+      --text-primary: #e8e8f0;
+      --text-secondary: #8b8da3;
+      --border: #333755;
+      --success: #00cec9;
+      --warning: #fdcb6e;
+      --danger: #ff6b6b;
+    }
+    body { background: var(--bg-primary); color: var(--text-primary); }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      transition: all 0.3s ease;
+    }
+    .card:hover { border-color: var(--accent); box-shadow: 0 0 30px var(--accent-glow); }
+    .input-field {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      border-radius: 10px;
+      padding: 10px 14px;
+      width: 100%;
+      transition: all 0.2s;
+    }
+    .input-field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      color: white; border: none; border-radius: 10px;
+      padding: 10px 24px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px var(--accent-glow); }
+    .btn-secondary {
+      background: var(--bg-input); color: var(--text-primary);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px 24px; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-secondary:hover { border-color: var(--accent-light); }
+    .btn-danger {
+      background: rgba(255, 107, 107, 0.15); color: var(--danger);
+      border: 1px solid rgba(255, 107, 107, 0.3); border-radius: 10px;
+      padding: 8px 16px; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-danger:hover { background: rgba(255, 107, 107, 0.25); }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .status-online { background: var(--success); box-shadow: 0 0 8px var(--success); }
+    .status-offline { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+    .status-checking { background: var(--warning); animation: pulse-dot 1s infinite; }
+    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .sidebar-link {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; border-radius: 10px;
+      color: var(--text-secondary); transition: all 0.2s; cursor: pointer;
+      text-decoration: none;
+    }
+    .sidebar-link:hover, .sidebar-link.active {
+      background: rgba(108, 92, 231, 0.15); color: var(--accent-light);
+    }
+    .sidebar-link.active { border-right: 3px solid var(--accent); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; animation: fadeUp 0.3s ease; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
+    .tool-card {
+      background: var(--bg-input); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px; transition: all 0.2s;
+    }
+    .tool-card:hover { border-color: var(--accent-light); }
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+      padding: 12px 28px; border-radius: 12px; font-weight: 500; z-index: 1000;
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); pointer-events: none;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast-success { background: var(--success); color: #000; }
+    .toast-error { background: var(--danger); color: #fff; }
+    .code-block {
+      background: #1a1a2e; border: 1px solid var(--border); border-radius: 10px;
+      padding: 14px; font-family: 'Courier New', monospace; font-size: 13px;
+      color: #a29bfe; overflow-x: auto; white-space: pre-wrap; direction: ltr; text-align: left;
+    }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+    .toggle-switch { position: relative; width: 44px; height: 24px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0; background: var(--bg-input);
+      border: 1px solid var(--border); border-radius: 24px; cursor: pointer; transition: 0.3s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute; width: 18px; height: 18px;
+      border-radius: 50%; background: var(--text-secondary);
+      top: 2px; right: 2px; transition: 0.3s;
+    }
+    .toggle-switch input:checked + .toggle-slider { background: var(--accent); border-color: var(--accent); }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(-20px); background: white; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  </style>
+  <link rel="stylesheet" href="/i18n.css" />
+</head>
+<body class="admin-page min-h-screen flex">
+  <!-- Sidebar -->
+  <aside class="w-64 bg-[#141628] border-l border-[#333755] flex flex-col min-h-screen sticky top-0">
+    <div class="p-5 border-b border-[#333755]">
+      <div data-language-toggle class="mb-3"></div>
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#6c5ce7] to-[#a29bfe] flex items-center justify-center">
+          <i class="fas fa-cogs text-white"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg"><span data-i18n="admin.title">System administration</span></h1>
+          <p class="text-xs text-[#8b8da3]">AI Assistant Admin</p>
+        </div>
+      </div>
+    </div>
+    <nav class="flex-1 p-3 space-y-1">
+      <div class="sidebar-link active" data-tab="dashboard">
+        <i class="fas fa-chart-line w-5 text-center"></i>
+        <span><span data-i18n="admin.dashboard">Dashboard</span></span>
+      </div>
+      <div class="sidebar-link" data-tab="api-settings">
+        <i class="fas fa-key w-5 text-center"></i>
+        <span><span data-i18n="admin.api">API settings</span></span>
+      </div>
+      <div class="sidebar-link" data-tab="services">
+        <i class="fas fa-server w-5 text-center"></i>
+        <span><span data-i18n="admin.services">Services</span></span>
+      </div>
+      <div class="sidebar-link" data-tab="tools">
+        <i class="fas fa-wrench w-5 text-center"></i>
+        <span><span data-i18n="admin.tools">Tools</span></span>
+      </div>
+      <div class="sidebar-link" data-tab="logs">
+        <i class="fas fa-terminal w-5 text-center"></i>
+        <span><span data-i18n="admin.logs">Logs</span></span>
+      </div>
+    </nav>
+    <div class="p-3 border-t border-[#333755]">
+      <a href="/" class="sidebar-link" data-i18n-title="admin.back" title="Back to the main chat">
+        <i class="fas fa-arrow-right w-5 text-center"></i>
+        <span><span data-i18n="common.back">Back to chat</span></span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="flex-1 p-6 overflow-y-auto scrollbar-thin">
+
+    <!-- ===== Dashboard ===== -->
+    <div id="tab-dashboard" class="tab-content active space-y-6">
+      <h2 class="text-2xl font-bold"><span data-i18n="admin.dashboard">Dashboard</span></h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm text-[#8b8da3]">Ollama LLM</span>
+            <span id="dash-status-ollama" class="status-dot status-checking"></span>
+          </div>
+          <p id="dash-info-ollama" class="font-bold text-lg"><span data-i18n="admin.checking">Checking...</span></p>
+          <p class="text-xs text-[#8b8da3] mt-1" id="dash-url-ollama"></p>
+        </div>
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm text-[#8b8da3]">Coqui TTS</span>
+            <span id="dash-status-tts" class="status-dot status-checking"></span>
+          </div>
+          <p id="dash-info-tts" class="font-bold text-lg"><span data-i18n="admin.checking">Checking...</span></p>
+          <p class="text-xs text-[#8b8da3] mt-1" id="dash-url-tts"></p>
+        </div>
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm text-[#8b8da3]">Whisper STT</span>
+            <span id="dash-status-whisper" class="status-dot status-checking"></span>
+          </div>
+          <p id="dash-info-whisper" class="font-bold text-lg"><span data-i18n="admin.checking">Checking...</span></p>
+          <p class="text-xs text-[#8b8da3] mt-1" id="dash-url-whisper"></p>
+        </div>
+      </div>
+      <div class="card p-5">
+        <h3 class="font-bold mb-3"><span data-i18n="admin.installedModels">Installed models</span></h3>
+        <div id="models-list" class="space-y-2">
+          <p class="text-[#8b8da3]"><i class="fas fa-spinner fa-spin"></i> <span data-i18n="common.loading">Loading...</span></p>
+        </div>
+      </div>
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-bold"><span data-i18n="admin.registeredTools">Registered tools</span></h3>
+          <span id="tools-count" class="text-sm bg-[#6c5ce7] px-3 py-1 rounded-full">0</span>
+        </div>
+        <div id="dashboard-tools-preview" class="text-[#8b8da3]"><span data-i18n="common.loading">Loading...</span></div>
+      </div>
+    </div>
+
+    <!-- ===== API Settings ===== -->
+    <div id="tab-api-settings" class="tab-content space-y-6">
+      <h2 class="text-2xl font-bold"><span data-i18n="admin.api">API settings</span></h2>
+
+      <div class="card p-6 space-y-5">
+        <h3 class="font-bold text-lg flex items-center gap-2">
+          <i class="fas fa-server text-[#6c5ce7]"></i> <span data-i18n="admin.localServices">Local services</span>
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="text-sm text-[#8b8da3] block mb-1">Ollama Host</label>
+            <input id="cfg-ollama-host" class="input-field" dir="ltr" placeholder="http://localhost:11434" />
+          </div>
+          <div>
+            <label class="text-sm text-[#8b8da3] block mb-1"><span data-i18n="admin.defaultModel">Default model</span></label>
+            <input id="cfg-default-model" class="input-field" dir="ltr" placeholder="llama3.2" />
+          </div>
+          <div>
+            <label class="text-sm text-[#8b8da3] block mb-1">TTS Host (Coqui)</label>
+            <input id="cfg-tts-host" class="input-field" dir="ltr" placeholder="http://localhost:5002" />
+          </div>
+          <div>
+            <label class="text-sm text-[#8b8da3] block mb-1">Whisper Host</label>
+            <input id="cfg-whisper-host" class="input-field" dir="ltr" placeholder="http://localhost:9000" />
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-6 space-y-5">
+        <h3 class="font-bold text-lg flex items-center gap-2">
+          <i class="fas fa-cloud text-[#a29bfe]"></i> <span data-i18n="admin.externalKeys">External API keys</span>
+        </h3>
+        <div class="space-y-4">
+          <div>
+            <label class="text-sm text-[#8b8da3] block mb-1">OpenAI API Key</label>
+            <div class="flex gap-2">
+              <input id="cfg-openai-key" type="password" class="input-field" dir="ltr" placeholder="sk-..." />
+              <button class="btn-secondary text-sm" onclick="togglePasswordVisibility('cfg-openai-key', this)"><i class="fas fa-eye"></i></button>
+            </div>
+          </div>
+          <div>
+            <label class="text-sm text-[#8b8da3] block mb-1">XAI API Key</label>
+            <div class="flex gap-2">
+              <input id="cfg-xai-key" type="password" class="input-field" dir="ltr" placeholder="xai-..." />
+              <button class="btn-secondary text-sm" onclick="togglePasswordVisibility('cfg-xai-key', this)"><i class="fas fa-eye"></i></button>
+            </div>
+          </div>
+          <div>
+            <label class="text-sm text-[#8b8da3] block mb-1">ElevenLabs API Key</label>
+            <div class="flex gap-2">
+              <input id="cfg-elevenlabs-key" type="password" class="input-field" dir="ltr" placeholder="el-..." />
+              <button class="btn-secondary text-sm" onclick="togglePasswordVisibility('cfg-elevenlabs-key', this)"><i class="fas fa-eye"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-6 space-y-5">
+        <h3 class="font-bold text-lg flex items-center gap-2">
+          <i class="fas fa-sliders-h text-[#00cec9]"></i> <span data-i18n="admin.general">General settings</span>
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="text-sm text-[#8b8da3] block mb-1"><span data-i18n="admin.port">Server port</span></label>
+            <input id="cfg-port" class="input-field" type="number" placeholder="3001" />
+          </div>
+          <div>
+            <label class="text-sm text-[#8b8da3] block mb-1"><span data-i18n="admin.maxRequest">Maximum request size (MB)</span></label>
+            <input id="cfg-max-body" class="input-field" type="number" placeholder="10" />
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-3">
+        <button id="saveApiSettings" class="btn-primary"><i class="fas fa-save ml-2"></i><span data-i18n="admin.saveSettings">Save settings</span></button>
+        <button id="resetApiSettings" class="btn-secondary"><i class="fas fa-undo ml-2"></i><span data-i18n="admin.reset">Reset to defaults</span></button>
+      </div>
+    </div>
+
+    <!-- ===== Services ===== -->
+    <div id="tab-services" class="tab-content space-y-6">
+      <h2 class="text-2xl font-bold"><span data-i18n="admin.status">Service status</span></h2>
+      <div class="space-y-4">
+        <div class="card p-5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
+                <i class="fas fa-brain text-white text-xl"></i>
+              </div>
+              <div>
+                <h3 class="font-bold">Ollama</h3>
+                <p class="text-sm text-[#8b8da3]"><span data-i18n="admin.llm">Local LLM server</span></p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span id="svc-ollama-status" class="text-sm px-3 py-1 rounded-full bg-[#2a2f4a]"><span data-i18n="admin.checking">Checking...</span></span>
+              <button class="btn-secondary text-sm" onclick="checkService('ollama')"><i class="fas fa-sync-alt"></i></button>
+            </div>
+          </div>
+        </div>
+        <div class="card p-5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-teal-500 flex items-center justify-center">
+                <i class="fas fa-volume-up text-white text-xl"></i>
+              </div>
+              <div>
+                <h3 class="font-bold">Coqui TTS</h3>
+                <p class="text-sm text-[#8b8da3]"><span data-i18n="admin.tts">Text-to-speech</span></p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span id="svc-tts-status" class="text-sm px-3 py-1 rounded-full bg-[#2a2f4a]"><span data-i18n="admin.checking">Checking...</span></span>
+              <button class="btn-secondary text-sm" onclick="checkService('tts')"><i class="fas fa-sync-alt"></i></button>
+            </div>
+          </div>
+        </div>
+        <div class="card p-5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                <i class="fas fa-microphone text-white text-xl"></i>
+              </div>
+              <div>
+                <h3 class="font-bold">Faster-Whisper</h3>
+                <p class="text-sm text-[#8b8da3]"><span data-i18n="admin.stt">Speech recognition</span></p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span id="svc-whisper-status" class="text-sm px-3 py-1 rounded-full bg-[#2a2f4a]"><span data-i18n="admin.checking">Checking...</span></span>
+              <button class="btn-secondary text-sm" onclick="checkService('whisper')"><i class="fas fa-sync-alt"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="checkAllServices()">
+        <i class="fas fa-heartbeat ml-2"></i><span data-i18n="admin.checkAll">Check all services</span>
+      </button>
+    </div>
+
+    <!-- ===== Tools ===== -->
+    <div id="tab-tools" class="tab-content space-y-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-2xl font-bold"><span data-i18n="admin.tools">Tools</span></h2>
+        <div class="flex gap-2">
+          <button id="addExampleToolBtn" class="btn-secondary"><i class="fas fa-magic ml-2"></i><span data-i18n="admin.addExample">Add example tool</span></button>
+          <button id="addToolBtn" class="btn-primary"><i class="fas fa-plus ml-2"></i><span data-i18n="admin.newTool">New tool</span></button>
+        </div>
+      </div>
+      <p class="text-[#8b8da3]"><span data-i18n="admin.toolsHelp">These tools are available to the AI agent for working with files and folders.</span></p>
+      <div id="tools-list" class="space-y-3"></div>
+    </div>
+
+    <!-- ===== Logs ===== -->
+    <div id="tab-logs" class="tab-content space-y-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-2xl font-bold"><span data-i18n="admin.logs">Logs</span></h2>
+        <div class="flex gap-2">
+          <button class="btn-secondary text-sm" onclick="loadLogs()"><i class="fas fa-sync-alt ml-1"></i><span data-i18n="common.refresh">Refresh</span></button>
+          <button class="btn-danger text-sm" onclick="clearLogs()"><i class="fas fa-trash ml-1"></i><span data-i18n="common.clear">Clear</span></button>
+        </div>
+      </div>
+      <div id="logs-container" class="code-block max-h-[600px] overflow-y-auto scrollbar-thin"><span data-i18n="admin.loadingLogs">Loading logs...</span></div>
+    </div>
+  </main>
+
+  <!-- Tool Add/Edit Modal -->
+  <div id="toolModal" class="modal-backdrop hidden">
+    <div class="bg-[#222640] border border-[#333755] max-w-2xl w-full rounded-2xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto scrollbar-thin">
+      <h3 id="toolModalTitle" class="font-bold text-xl"><span data-i18n="admin.newTool">New tool</span></h3>
+      <div>
+        <label class="text-sm text-[#8b8da3] block mb-1"><span data-i18n="admin.toolName">Tool name</span></label>
+        <input id="tool-name" class="input-field" placeholder="Read-File" dir="ltr" />
+      </div>
+      <div>
+        <label class="text-sm text-[#8b8da3] block mb-1"><span data-i18n="admin.description">Description</span></label>
+        <input id="tool-description" class="input-field" data-i18n-placeholder="admin.descriptionPlaceholder" placeholder="Short tool description" />
+      </div>
+      <div>
+        <label class="text-sm text-[#8b8da3] block mb-1"><span data-i18n="admin.parameters">Parameters (JSON)</span></label>
+        <textarea id="tool-params" class="input-field font-mono text-sm" rows="3" dir="ltr" placeholder='[{"name":"Path","type":"string","required":true}]'></textarea>
+      </div>
+      <div>
+        <label class="text-sm text-[#8b8da3] block mb-1"><span data-i18n="admin.code">PowerShell code</span></label>
+        <textarea id="tool-code" class="input-field font-mono text-sm" rows="8" dir="ltr" placeholder="function My-Tool { param(...) ... }"></textarea>
+      </div>
+      <div class="flex items-center gap-3">
+        <label class="toggle-switch">
+          <input type="checkbox" id="tool-enabled" checked>
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="text-sm"><span data-i18n="admin.toolEnabled">Tool enabled</span></span>
+      </div>
+      <div class="flex gap-3 justify-end">
+        <button id="cancelToolModal" class="btn-secondary"><span data-i18n="common.cancel">Cancel</span></button>
+        <button id="saveToolModal" class="btn-primary"><i class="fas fa-save ml-2"></i><span data-i18n="common.save">Save</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast toast-success"><span data-i18n="admin.saved">Saved successfully</span></div>
+
+  <script>
+    // ====== STATE ======
+    let tools = [];
+    let editingToolIndex = -1;
+    let config = {};
+
+    // ====== INIT ======
+    async function init() {
+      await loadConfig();
+      await loadTools();
+      checkAllServices();
+      loadLogs();
+      updateDashboard();
+    }
+
+    // ====== NAVIGATION ======
+    document.querySelectorAll('.sidebar-link[data-tab]').forEach(link => {
+      link.addEventListener('click', () => {
+        document.querySelectorAll('.sidebar-link[data-tab]').forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        const target = document.getElementById('tab-' + link.dataset.tab);
+        if (target) target.classList.add('active');
+      });
+    });
+
+    // ====== TOAST ======
+    function showToast(msg, type = 'success') {
+      const toast = document.getElementById('toast');
+      I18n.setText(toast, msg);
+      toast.className = 'toast toast-' + type + ' show';
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    // ====== CONFIG ======
+    async function loadConfig() {
+      try {
+        const r = await fetch('/admin/config');
+        if (!r.ok) throw new Error('Failed');
+        config = await r.json();
+        document.getElementById('cfg-ollama-host').value = config.OLLAMA_HOST || '';
+        document.getElementById('cfg-default-model').value = config.DEFAULT_MODEL || '';
+        document.getElementById('cfg-tts-host').value = config.TTS_HOST || '';
+        document.getElementById('cfg-whisper-host').value = config.WHISPER_HOST || '';
+        document.getElementById('cfg-openai-key').value = config.OPENAI_KEY || '';
+        document.getElementById('cfg-xai-key').value = config.XAI_API_KEY || '';
+        document.getElementById('cfg-elevenlabs-key').value = config.ELEVENLABS_API_KEY || '';
+        document.getElementById('cfg-port').value = config.PORT || 3001;
+        document.getElementById('cfg-max-body').value = config.MAX_BODY_MB || 10;
+      } catch (e) {
+        console.error('Failed to load config:', e);
+      }
+    }
+
+    document.getElementById('saveApiSettings').onclick = async () => {
+      const newConfig = {
+        LISTEN_HOST: config.LISTEN_HOST || '127.0.0.1',
+        OLLAMA_HOST: document.getElementById('cfg-ollama-host').value.trim(),
+        DEFAULT_MODEL: document.getElementById('cfg-default-model').value.trim(),
+        TTS_HOST: document.getElementById('cfg-tts-host').value.trim(),
+        WHISPER_HOST: document.getElementById('cfg-whisper-host').value.trim(),
+        OPENAI_KEY: document.getElementById('cfg-openai-key').value.trim(),
+        XAI_API_KEY: document.getElementById('cfg-xai-key').value.trim(),
+        ELEVENLABS_API_KEY: document.getElementById('cfg-elevenlabs-key').value.trim(),
+        PORT: parseInt(document.getElementById('cfg-port').value) || 3001,
+        MAX_BODY_MB: parseInt(document.getElementById('cfg-max-body').value) || 10,
+      };
+      try {
+        const r = await fetch('/admin/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newConfig)
+        });
+        if (r.ok) {
+          showToast(I18n.message('admin.configSaved'));
+          config = newConfig;
+        } else throw new Error();
+      } catch (e) {
+        showToast(I18n.message('admin.configFailed'), 'error');
+      }
+    };
+
+    document.getElementById('resetApiSettings').onclick = async () => {
+      if (!confirm(I18n.t('admin.resetConfirm'))) return;
+      try {
+        const r = await fetch('/admin/config/reset', { method: 'POST' });
+        if (r.ok) {
+          showToast(I18n.message('admin.configReset'));
+          await loadConfig();
+        }
+      } catch (e) {
+        showToast(I18n.message('admin.resetFailed'), 'error');
+      }
+    };
+
+    function togglePasswordVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      const icon = btn.querySelector('i');
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fas fa-eye-slash';
+      } else {
+        input.type = 'password';
+        icon.className = 'fas fa-eye';
+      }
+    }
+
+    // ====== SERVICES STATUS ======
+    async function checkAllServices() {
+      await Promise.allSettled([
+        checkService('ollama'),
+        checkService('tts'),
+        checkService('whisper')
+      ]);
+    }
+
+    async function checkService(service) {
+      // Dashboard elements
+      const dashDot = document.getElementById('dash-status-' + service);
+      const dashInfo = document.getElementById('dash-info-' + service);
+      const dashUrl = document.getElementById('dash-url-' + service);
+      // Services page elements
+      const svcLabel = document.getElementById('svc-' + service + '-status');
+
+      if (dashDot) dashDot.className = 'status-dot status-checking';
+      if (svcLabel) { I18n.setText(svcLabel, I18n.message('admin.checking')); svcLabel.className = 'text-sm px-3 py-1 rounded-full bg-[#2a2f4a]'; }
+
+      try {
+        const r = await fetch('/admin/health/' + service);
+        const data = await r.json();
+        if (data.status === 'online') {
+          if (dashDot) dashDot.className = 'status-dot status-online';
+          if (dashInfo) I18n.setText(dashInfo, Number.isInteger(data.modelCount)
+            ? I18n.message(data.modelCount === 1 ? 'admin.modelCountOne' : 'admin.modelCount', { count: data.modelCount })
+            : I18n.message('common.active'));
+          if (dashUrl) dashUrl.textContent = data.url || '';
+          if (svcLabel) { I18n.setText(svcLabel, I18n.message('admin.online')); svcLabel.className = 'text-sm px-3 py-1 rounded-full bg-green-900/40 text-green-400'; }
+        } else {
+          throw new Error(data.info || 'offline');
+        }
+      } catch (e) {
+        if (dashDot) dashDot.className = 'status-dot status-offline';
+        if (dashInfo) I18n.setText(dashInfo, I18n.message('common.unavailable'));
+        if (dashUrl) dashUrl.textContent = '';
+        if (svcLabel) { I18n.setText(svcLabel, I18n.message('admin.offline')); svcLabel.className = 'text-sm px-3 py-1 rounded-full bg-red-900/40 text-red-400'; }
+      }
+    }
+
+    // ====== TOOLS MANAGEMENT ======
+    async function loadTools() {
+      try {
+        const r = await fetch('/admin/tools');
+        if (!r.ok) throw new Error();
+        tools = await r.json();
+      } catch (e) {
+        tools = [];
+        console.error('Failed to load tools:', e);
+      }
+      renderTools();
+      document.getElementById('tools-count').textContent = tools.length;
+      renderDashboardToolsPreview();
+    }
+
+    function renderTools() {
+      const container = document.getElementById('tools-list');
+      if (tools.length === 0) {
+        container.innerHTML = '<div class="text-center text-[#8b8da3] py-8"><i class="fas fa-puzzle-piece text-4xl mb-3 block"></i><p><span data-i18n="admin.noToolsYet">No tools configured yet</span></p></div>';
+        return;
+      }
+      container.innerHTML = tools.map((tool, i) => {
+        const isOn = tool.enabled !== false;
+        const paramsHtml = (tool.params && tool.params.length)
+          ? '<div class="mt-3 flex flex-wrap gap-2">' + tool.params.map(p => '<span class="text-xs px-2 py-1 bg-[#2a2f4a] rounded-full" dir="ltr">' + esc(p.name) + ': ' + esc(p.type) + '</span>').join('') + '</div>'
+          : '';
+        return '<div class="tool-card">' +
+          '<div class="flex items-center justify-between">' +
+            '<div class="flex items-center gap-3">' +
+              '<div class="w-10 h-10 rounded-lg ' + (isOn ? 'bg-[#6c5ce7]/20 text-[#a29bfe]' : 'bg-gray-700/30 text-gray-500') + ' flex items-center justify-center"><i class="fas fa-puzzle-piece"></i></div>' +
+              '<div><h4 class="font-bold" dir="ltr">' + esc(tool.name) + '</h4><p class="text-sm text-[#8b8da3]">' + esc(tool.description || '') + '</p></div>' +
+            '</div>' +
+            '<div class="flex items-center gap-2">' +
+              '<span class="text-xs px-2 py-1 rounded ' + (isOn ? 'bg-green-900/30 text-green-400' : 'bg-gray-700/30 text-gray-500') + '">' + I18n.html(isOn ? 'common.active' : 'common.disabled') + '</span>' +
+              '<button class="btn-secondary text-sm p-2" onclick="editTool(' + i + ')" data-i18n-title="common.edit" title="Edit"><i class="fas fa-pen"></i></button>' +
+              '<button class="btn-danger text-sm p-2" onclick="deleteTool(' + i + ')" data-i18n-title="common.delete" title="Delete"><i class="fas fa-trash-alt"></i></button>' +
+            '</div>' +
+          '</div>' +
+          paramsHtml +
+          '<details class="mt-3"><summary class="text-sm text-[#8b8da3] cursor-pointer hover:text-[#a29bfe]"><span data-i18n="admin.showCode">Show code</span></summary><div class="code-block mt-2 text-xs">' + esc(tool.code || '') + '</div></details>' +
+        '</div>';
+      }).join('');
+    }
+
+    function renderDashboardToolsPreview() {
+      const el = document.getElementById('dashboard-tools-preview');
+      if (tools.length === 0) {
+        I18n.setText(el, I18n.message('admin.noTools'));
+        return;
+      }
+      const tags = tools.slice(0, 6).map(t => '<span class="inline-block text-xs px-2 py-1 bg-[#2a2f4a] rounded-full ml-1 mb-1" dir="ltr">' + esc(t.name) + '</span>').join('');
+      const more = tools.length > 6 ? I18n.html('admin.more', { count: tools.length - 6 }) : '';
+      delete el.dataset.i18n;
+      delete el.dataset.i18nParams;
+      el.innerHTML = tags + more;
+    }
+
+    // Open modal for new tool
+    document.getElementById('addToolBtn').onclick = () => {
+      editingToolIndex = -1;
+      I18n.setText(document.getElementById('toolModalTitle'), I18n.message('admin.newTool'));
+      document.getElementById('tool-name').value = '';
+      document.getElementById('tool-description').value = '';
+      document.getElementById('tool-params').value = '';
+      document.getElementById('tool-code').value = '';
+      document.getElementById('tool-enabled').checked = true;
+      document.getElementById('toolModal').classList.remove('hidden');
+    };
+
+    // Add example tool
+    document.getElementById('addExampleToolBtn').onclick = async () => {
+      const example = {
+        name: 'Search-Text',
+        description: I18n.t('admin.exampleDescription'),
+        params: [
+          { name: 'Path', type: 'string', required: true },
+          { name: 'Pattern', type: 'string', required: true },
+          { name: 'Recurse', type: 'bool', required: false }
+        ],
+        code: 'function Search-Text {\n  param(\n    [string]$Path,\n    [string]$Pattern,\n    [switch]$Recurse\n  )\n  try {\n    $params = @{ Path = $Path; Pattern = $Pattern; ErrorAction = "Stop" }\n    if ($Recurse) { $params.Recurse = $true }\n    $results = Select-String @params\n    foreach ($r in $results) {\n      Write-Output "$($r.Path):$($r.LineNumber): $($r.Line.Trim())"\n    }\n    Write-Log "Search-Text found $($results.Count) matches for \'$Pattern\' in $Path"\n  } catch {\n    Write-Log "Search-Text failed: $_" "ERROR"\n    return $null\n  }\n}',
+        enabled: true
+      };
+      try {
+        const r = await fetch('/admin/tools', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(example)
+        });
+        if (r.ok) {
+          showToast(I18n.message('admin.exampleAdded'));
+          await loadTools();
+        } else throw new Error();
+      } catch (e) {
+        showToast(I18n.message('admin.exampleFailed'), 'error');
+      }
+    };
+
+    function editTool(index) {
+      editingToolIndex = index;
+      const tool = tools[index];
+      I18n.setText(document.getElementById('toolModalTitle'), I18n.message('admin.editTool', { name: tool.name }));
+      document.getElementById('tool-name').value = tool.name;
+      document.getElementById('tool-description').value = tool.description || '';
+      document.getElementById('tool-params').value = tool.params ? JSON.stringify(tool.params, null, 2) : '';
+      document.getElementById('tool-code').value = tool.code || '';
+      document.getElementById('tool-enabled').checked = tool.enabled !== false;
+      document.getElementById('toolModal').classList.remove('hidden');
+    }
+
+    async function deleteTool(index) {
+      if (!confirm(I18n.t('admin.deleteConfirm', { name: tools[index].name }))) return;
+      try {
+        const r = await fetch('/admin/tools/' + index, { method: 'DELETE' });
+        if (r.ok) {
+          showToast(I18n.message('admin.deleted'));
+          await loadTools();
+        }
+      } catch (e) {
+        showToast(I18n.message('admin.deleteFailed'), 'error');
+      }
+    }
+
+    // Modal controls
+    document.getElementById('cancelToolModal').onclick = () => {
+      document.getElementById('toolModal').classList.add('hidden');
+    };
+
+    // Close modal on backdrop click
+    document.getElementById('toolModal').onclick = (e) => {
+      if (e.target === document.getElementById('toolModal')) {
+        document.getElementById('toolModal').classList.add('hidden');
+      }
+    };
+
+    // Close modal on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.getElementById('toolModal').classList.add('hidden');
+      }
+    });
+
+    document.getElementById('saveToolModal').onclick = async () => {
+      const name = document.getElementById('tool-name').value.trim();
+      const description = document.getElementById('tool-description').value.trim();
+      const paramsStr = document.getElementById('tool-params').value.trim();
+      const code = document.getElementById('tool-code').value.trim();
+      const enabled = document.getElementById('tool-enabled').checked;
+
+      if (!name) { showToast(I18n.message('admin.nameRequired'), 'error'); return; }
+      if (!code) { showToast(I18n.message('admin.codeRequired'), 'error'); return; }
+
+      let params = [];
+      if (paramsStr) {
+        try { params = JSON.parse(paramsStr); } catch (e) { showToast(I18n.message('admin.invalidParams'), 'error'); return; }
+      }
+
+      const tool = { name, description, params, code, enabled };
+
+      try {
+        let r;
+        if (editingToolIndex >= 0) {
+          r = await fetch('/admin/tools/' + editingToolIndex, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(tool)
+          });
+        } else {
+          r = await fetch('/admin/tools', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(tool)
+          });
+        }
+        if (r.ok) {
+          showToast(editingToolIndex >= 0 ? I18n.message('admin.updated') : I18n.message('admin.added'));
+          document.getElementById('toolModal').classList.add('hidden');
+          await loadTools();
+        } else throw new Error();
+      } catch (e) {
+        showToast(I18n.message('admin.saveFailed'), 'error');
+      }
+    };
+
+    // ====== LOGS ======
+    async function loadLogs() {
+      try {
+        const r = await fetch('/admin/logs');
+        const data = await r.json();
+        const container = document.getElementById('logs-container');
+        if (data.logs && data.logs.length) {
+          I18n.setText(container, data.logs.join('\n'));
+          container.scrollTop = container.scrollHeight;
+        } else {
+          I18n.setText(container, I18n.message('admin.noLogs'));
+        }
+      } catch (e) {
+        I18n.setText(document.getElementById('logs-container'), I18n.message('admin.logsFailed'));
+      }
+    }
+
+    async function clearLogs() {
+      if (!confirm(I18n.t('admin.clearLogsConfirm'))) return;
+      try {
+        await fetch('/admin/logs', { method: 'DELETE' });
+        showToast(I18n.message('admin.logsCleared'));
+        loadLogs();
+      } catch (e) {
+        showToast(I18n.message('common.error'), 'error');
+      }
+    }
+
+    // ====== DASHBOARD ======
+    async function updateDashboard() {
+      try {
+        const r = await fetch('/api/tags');
+        if (r.ok) {
+          const data = await r.json();
+          const models = data.models || [];
+          const el = document.getElementById('models-list');
+          if (models.length === 0) {
+            el.innerHTML = '<p class="text-[#8b8da3]"><span data-i18n="admin.noModels">No installed models</span></p>';
+          } else {
+            el.innerHTML = models.map(m =>
+              '<div class="flex items-center justify-between py-2 px-3 bg-[#2a2f4a] rounded-lg">' +
+                '<span class="font-mono text-sm" dir="ltr">' + esc(m.name) + '</span>' +
+                '<span class="text-xs text-[#8b8da3]">' + formatBytes(m.size) + '</span>' +
+              '</div>'
+            ).join('');
+          }
+        }
+      } catch (e) {
+        document.getElementById('models-list').innerHTML = '<p class="text-red-400"><span data-i18n="admin.modelsFailed">Unable to load models</span></p>';
+      }
+    }
+
+    // ====== UTILS ======
+    function esc(str) {
+      if (!str) return '';
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return '0 B';
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(1024));
+      return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
+    }
+
+    // ====== START ======
+    init();
+  </script>
+</body>
+</html>

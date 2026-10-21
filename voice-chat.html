@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <script src="/i18n.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title data-i18n="voice.pageTitle">Voice chat - AI Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    * { box-sizing: border-box; }
+    body { background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+    
+    /* Orb animation */
+    .orb-container { position: relative; width: 200px; height: 200px; }
+    .orb {
+      width: 200px; height: 200px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #818cf8, #4f46e5, #312e81);
+      box-shadow: 0 0 60px rgba(99, 102, 241, 0.3);
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .orb.listening {
+      animation: orbPulse 2s ease-in-out infinite;
+      box-shadow: 0 0 80px rgba(99, 102, 241, 0.5);
+    }
+    .orb.recording {
+      animation: orbRecord 0.8s ease-in-out infinite;
+      background: radial-gradient(circle at 35% 35%, #f87171, #ef4444, #991b1b);
+      box-shadow: 0 0 100px rgba(239, 68, 68, 0.6);
+    }
+    .orb.processing {
+      animation: orbSpin 1.5s linear infinite;
+      background: radial-gradient(circle at 35% 35%, #fbbf24, #f59e0b, #92400e);
+      box-shadow: 0 0 80px rgba(245, 158, 11, 0.5);
+    }
+    .orb.speaking {
+      animation: orbSpeak 0.4s ease-in-out infinite alternate;
+      background: radial-gradient(circle at 35% 35%, #34d399, #10b981, #065f46);
+      box-shadow: 0 0 100px rgba(16, 185, 129, 0.6);
+    }
+    
+    @keyframes orbPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    @keyframes orbRecord {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.12); }
+    }
+    @keyframes orbSpin {
+      0% { transform: rotate(0deg) scale(1.02); }
+      100% { transform: rotate(360deg) scale(1.02); }
+    }
+    @keyframes orbSpeak {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.08); }
+    }
+
+    /* Volume visualizer ring */
+    .volume-ring {
+      position: absolute; inset: -10px; border-radius: 50%;
+      border: 3px solid transparent;
+      transition: border-color 0.1s, transform 0.1s;
+    }
+    .volume-ring.active {
+      border-color: rgba(99, 102, 241, 0.6);
+    }
+
+    /* Transcript area */
+    .transcript-area {
+      max-height: 300px; overflow-y: auto;
+      scrollbar-width: thin; scrollbar-color: #475569 transparent;
+    }
+    .transcript-area::-webkit-scrollbar { width: 6px; }
+    .transcript-area::-webkit-scrollbar-track { background: transparent; }
+    .transcript-area::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+
+    .msg-user { background: #312e81; border-radius: 12px 12px 4px 12px; }
+    .msg-assistant { background: #1e293b; border-radius: 12px 12px 12px 4px; border: 1px solid #334155; }
+
+    /* Settings panel */
+    .settings-panel {
+      transition: max-height 0.3s ease, opacity 0.3s ease;
+      max-height: 0; opacity: 0; overflow: hidden;
+    }
+    .settings-panel.open { max-height: 600px; opacity: 1; }
+
+    /* Fade in animation */
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
+  </style>
+  <link rel="stylesheet" href="/i18n.css" />
+</head>
+<body class="h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="flex items-center justify-between p-3 border-b border-slate-700">
+    <div class="flex items-center gap-3">
+      <a href="/" class="text-slate-400 hover:text-white transition-colors" data-i18n-title="common.back" title="Back to chat">
+        <i class="fas fa-arrow-right text-lg"></i>
+      </a>
+      <i class="fas fa-headset text-indigo-400 text-xl"></i>
+      <h1 class="font-bold text-lg"><span data-i18n="voice.title">Interactive voice chat</span></h1>
+    </div>
+    <div class="flex items-center gap-2">
+      <div data-language-toggle></div>
+      <span id="statusBadge" class="text-xs bg-slate-700 px-2 py-1 rounded-full"><span data-i18n="voice.inactive">Inactive</span></span>
+      <button id="settingsToggle" data-i18n-aria-label="common.settings" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700 transition-colors">
+        <i class="fas fa-sliders-h"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Settings Panel -->
+  <div id="settingsPanel" class="settings-panel border-b border-slate-700 bg-slate-800/50">
+    <div class="p-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+      <!-- VAD Settings -->
+      <div>
+        <label class="text-slate-400 block mb-1"><span data-i18n="voice.startThreshold">Speech start threshold (RMS)</span></label>
+        <input type="range" id="vadStartThreshold" min="0.005" max="0.1" step="0.005" value="0.02" class="w-full accent-indigo-500">
+        <span id="vadStartValue" class="text-slate-500 text-xs">0.02</span>
+      </div>
+      <div>
+        <label class="text-slate-400 block mb-1"><span data-i18n="voice.endThreshold">Speech end threshold (RMS)</span></label>
+        <input type="range" id="vadEndThreshold" min="0.003" max="0.08" step="0.002" value="0.015" class="w-full accent-indigo-500">
+        <span id="vadEndValue" class="text-slate-500 text-xs">0.015</span>
+      </div>
+      <div>
+        <label class="text-slate-400 block mb-1"><span data-i18n="voice.silence">Silence before stopping (seconds)</span></label>
+        <input type="range" id="silenceDuration" min="0.5" max="3" step="0.1" value="1.5" class="w-full accent-indigo-500">
+        <span id="silenceValue" class="text-slate-500 text-xs">1.5s</span>
+      </div>
+      <div>
+        <label class="text-slate-400 block mb-1"><span data-i18n="voice.minimum">Minimum duration (seconds)</span></label>
+        <input type="range" id="minSpeechDuration" min="0.3" max="2" step="0.1" value="0.5" class="w-full accent-indigo-500">
+        <span id="minSpeechValue" class="text-slate-500 text-xs">0.5s</span>
+      </div>
+      
+      <!-- Language & Model -->
+      <div>
+        <label class="text-slate-400 block mb-1"><span data-i18n="speech.language">Speech language</span></label>
+        <select id="voiceLang" data-i18n-aria-label="speech.language" class="w-full bg-slate-700 border border-slate-600 rounded p-1.5 text-white">
+          <option value="he" data-i18n="ui.hebrew">Hebrew</option>
+          <option value="en" selected>English</option>
+          <option value="" data-i18n="speech.auto">Automatic</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-slate-400 block mb-1"><span data-i18n="common.model">Model</span></label>
+        <select id="voiceModel" class="w-full bg-slate-700 border border-slate-600 rounded p-1.5 text-white">
+          <option value="" data-i18n="common.loading">Loading...</option>
+        </select>
+      </div>
+      
+      <!-- TTS Engine Selection -->
+      <div>
+        <label class="text-slate-400 block mb-1"><span data-i18n="tts.engine">TTS engine</span></label>
+        <select id="voiceTTS" class="w-full bg-slate-700 border border-slate-600 rounded p-1.5 text-white">
+          <option value="windows" data-i18n="tts.windows">Windows TTS (local)</option>
+          <option value="coqui" data-i18n="tts.coqui">Coqui TTS (server)</option>
+          <option value="off" data-i18n="common.disabled">Off</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-slate-400 block mb-1"><span data-i18n="voice.maximum">Maximum duration (seconds)</span></label>
+        <input type="range" id="maxSpeechDuration" min="5" max="60" step="5" value="30" class="w-full accent-indigo-500">
+        <span id="maxSpeechValue" class="text-slate-500 text-xs">30s</span>
+      </div>
+
+      <!-- Voice Selection (Windows TTS) -->
+      <div id="windowsVoiceSettings" class="col-span-2 md:col-span-4 border-t border-slate-600 pt-3 mt-1">
+        <div class="flex items-center gap-3 mb-2">
+          <label class="text-slate-400"><span data-i18n="tts.windowsVoice">Windows voice:</span></label>
+          <select id="windowsVoiceSelect" class="flex-1 bg-slate-700 border border-slate-600 rounded p-1.5 text-white text-sm">
+            <option value="" data-i18n="tts.loading">Loading voices...</option>
+          </select>
+          <button id="refreshVoicesBtn" class="text-slate-400 hover:text-white p-1.5 rounded hover:bg-slate-600" data-i18n-title="tts.refresh" title="Refresh voices">
+            <i class="fas fa-sync-alt text-xs"></i>
+          </button>
+        </div>
+        <div class="flex items-center gap-3">
+          <label class="text-slate-400 text-xs">
+            <input type="checkbox" id="autoVoiceSwitch" checked class="mr-1 accent-indigo-500">
+            <span data-i18n="tts.autoSwitch">Automatic voice switching (Avri Hebrew / Ava English)</span>
+          </label>
+          <label class="text-slate-400 text-xs">
+            <span><span data-i18n="tts.speed">Speed:</span></span>
+            <input type="range" id="windowsTTSRate" min="0.5" max="2" step="0.1" value="1" class="w-20 accent-indigo-500">
+            <span id="windowsTTSRateValue" class="text-slate-500">1.0</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <main class="flex-1 flex flex-col items-center justify-between p-4 overflow-hidden">
+    
+    <!-- Transcript area -->
+    <div id="transcriptArea" class="transcript-area w-full max-w-2xl space-y-3 flex-1 mb-4">
+      <div class="text-center text-slate-500 text-sm py-8">
+        <i class="fas fa-comments text-3xl mb-3 block text-slate-600"></i>
+        <span data-i18n="voice.empty">Click the button below to start a conversation</span>
+      </div>
+    </div>
+
+    <!-- Orb + Controls -->
+    <div class="flex flex-col items-center gap-6 pb-4">
+      
+      <!-- Volume meter -->
+      <div class="w-full max-w-xs h-2 bg-slate-800 rounded-full overflow-hidden">
+        <div id="volumeBar" class="h-full bg-indigo-500 rounded-full transition-all duration-75" style="width: 0%"></div>
+      </div>
+
+      <!-- Orb -->
+      <div class="orb-container flex items-center justify-center">
+        <div class="volume-ring" id="volumeRing"></div>
+        <div id="orb" role="button" tabindex="0" data-i18n-aria-label="voice.orbTitle" class="orb cursor-pointer" data-i18n-title="voice.orbTitle" title="Click to start or stop"></div>
+      </div>
+
+      <!-- Status text -->
+      <div id="statusText" class="text-slate-400 text-center text-sm h-6">
+        <span data-i18n="voice.ready">Click the circle to start a conversation</span>
+      </div>
+
+      <!-- Controls -->
+      <div class="flex items-center gap-4">
+        <button id="startBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-full font-bold text-lg transition-all shadow-lg shadow-indigo-500/25 flex items-center gap-2">
+          <i class="fas fa-play"></i>
+          <span><span data-i18n="voice.start">Start conversation</span></span>
+        </button>
+        <button id="stopBtn" class="hidden bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-full font-bold text-lg transition-all shadow-lg shadow-red-500/25 flex items-center gap-2">
+          <i class="fas fa-stop"></i>
+          <span><span data-i18n="common.stop">Stop</span></span>
+        </button>
+        <button id="forceStopBtn" class="hidden text-red-400 hover:text-red-300 p-3 rounded-full hover:bg-slate-800 transition-colors" data-i18n-title="voice.stopSpeech" title="Stop speaking immediately">
+          <i class="fas fa-volume-mute text-lg"></i>
+        </button>
+        <button id="clearBtn" class="text-slate-500 hover:text-slate-300 p-3 rounded-full hover:bg-slate-800 transition-colors" data-i18n-title="voice.clear" title="Clear conversation">
+          <i class="fas fa-trash-alt"></i>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // ============================================================
+    //  INTERACTIVE VOICE CHAT - VAD + Smart Voice Selection
+    // ============================================================
+
+    // --- DOM ---
+    const orb = document.getElementById('orb');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const forceStopBtn = document.getElementById('forceStopBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const statusText = document.getElementById('statusText');
+    const statusBadge = document.getElementById('statusBadge');
+    const volumeBar = document.getElementById('volumeBar');
+    const volumeRing = document.getElementById('volumeRing');
+    const transcriptArea = document.getElementById('transcriptArea');
+    const settingsToggle = document.getElementById('settingsToggle');
+    const settingsPanel = document.getElementById('settingsPanel');
+
+    // Settings elements
+    const vadStartSlider = document.getElementById('vadStartThreshold');
+    const vadEndSlider = document.getElementById('vadEndThreshold');
+    const silenceSlider = document.getElementById('silenceDuration');
+    const minSpeechSlider = document.getElementById('minSpeechDuration');
+    const maxSpeechSlider = document.getElementById('maxSpeechDuration');
+    const voiceLang = document.getElementById('voiceLang');
+    const voiceModel = document.getElementById('voiceModel');
+    const voiceTTS = document.getElementById('voiceTTS');
+    const windowsVoiceSelect = document.getElementById('windowsVoiceSelect');
+    const windowsVoiceSettings = document.getElementById('windowsVoiceSettings');
+    const refreshVoicesBtn = document.getElementById('refreshVoicesBtn');
+    const autoVoiceSwitch = document.getElementById('autoVoiceSwitch');
+    const windowsTTSRate = document.getElementById('windowsTTSRate');
+    const windowsTTSRateValue = document.getElementById('windowsTTSRateValue');
+
+    // --- STATE ---
+    let isActive = false;
+    let isAgentSpeaking = false;
+    let audioContext = null;
+    let mediaStream = null;
+    let scriptProcessor = null;
+    let conversationId = null;
+    let conversationHistory = [];
+
+    // --- AUDIO QUEUE (from reference code) ---
+    const audioQueue = [];
+    let isProcessingQueue = false;
+    let currentAudio = null;
+    let currentAudioUrl = null;
+
+    // --- VOICES ---
+    let allVoices = [];
+    const VOICE_STORAGE_KEY = 'voiceChat_selectedVoice';
+
+    // --- VAD CONFIG ---
+    const SAMPLE_RATE = 16000;
+    const BUFFER_SIZE = 4096;
+
+    function getConfig() {
+      return {
+        vadStartThreshold: parseFloat(vadStartSlider.value),
+        vadEndThreshold: parseFloat(vadEndSlider.value),
+        silenceDurationMs: parseFloat(silenceSlider.value) * 1000,
+        minSpeechDurationMs: parseFloat(minSpeechSlider.value) * 1000,
+        maxSpeechDurationS: parseFloat(maxSpeechSlider.value),
+        language: voiceLang.value,
+        model: voiceModel.value,
+        ttsEngine: voiceTTS.value,
+        autoVoice: autoVoiceSwitch.checked,
+        ttsRate: parseFloat(windowsTTSRate.value)
+      };
+    }
+
+    // ============================================================
+    //  VOICE LOADING & SMART SELECTION (from reference)
+    // ============================================================
+
+    function loadWindowsVoices() {
+      allVoices = speechSynthesis.getVoices();
+      windowsVoiceSelect.innerHTML = '';
+
+      let firstHebrewIndex = -1;
+      let avriIndex = -1;
+      const storedVoiceName = localStorage.getItem(VOICE_STORAGE_KEY);
+      let storedVoiceFound = false;
+
+      allVoices.forEach((voice, index) => {
+        // Show Hebrew voices + Multilingual + English voices
+        const isHebrew = voice.lang.includes('he') || voice.name.includes('Hebrew');
+        const isMultilingual = voice.name.includes('Multilingual');
+        const isEnUS = voice.lang.includes('en-US');
+        
+        if (isHebrew || isMultilingual || isEnUS) {
+          const option = document.createElement('option');
+          option.value = index;
+          
+          // Mark language type for clarity
+          let langLabel = '';
+          if (isHebrew) langLabel = '🇮🇱';
+          else if (isEnUS) langLabel = '🇺🇸';
+          else langLabel = '🌐';
+          
+          option.textContent = `${langLabel} ${voice.name} (${voice.lang})`;
+          windowsVoiceSelect.appendChild(option);
+
+          if (isHebrew && firstHebrewIndex === -1) firstHebrewIndex = index;
+          if (voice.name.includes('Avri')) avriIndex = index;
+          if (storedVoiceName && voice.name === storedVoiceName) {
+            storedVoiceFound = true;
+            option.selected = true;
+          }
+        }
+      });
+
+      // Default selection priority: stored > Avri > first Hebrew
+      if (!storedVoiceFound) {
+        if (avriIndex !== -1) {
+          windowsVoiceSelect.value = avriIndex;
+          localStorage.setItem(VOICE_STORAGE_KEY, allVoices[avriIndex].name);
+        } else if (firstHebrewIndex !== -1) {
+          windowsVoiceSelect.value = firstHebrewIndex;
+        }
+      }
+
+      if (windowsVoiceSelect.options.length === 0) {
+        windowsVoiceSelect.innerHTML = '<option value="" data-i18n="tts.noSuitableVoices">No suitable voices found</option>';
+      }
+    }
+
+    /**
+     * Smart voice selection based on text language (Avri for Hebrew, Ava for English)
+     */
+    function getVoiceForText(text) {
+      const config = getConfig();
+      
+      // If auto-switch is disabled, use the manually selected voice
+      if (!config.autoVoice) {
+        const selectedIdx = parseInt(windowsVoiceSelect.value);
+        if (!isNaN(selectedIdx) && allVoices[selectedIdx]) {
+          return allVoices[selectedIdx];
+        }
+        return null;
+      }
+
+      const isHebrewText = /[\u0590-\u05FF]/.test(text);
+      const isEnglishText = /[a-zA-Z]/.test(text) && !isHebrewText;
+
+      let selectedVoice = null;
+
+      if (isEnglishText) {
+        // English text → prefer Ava (United States)
+        selectedVoice = allVoices.find(v => v.name.includes('Ava') && v.name.includes('United States'));
+        if (!selectedVoice) {
+          selectedVoice = allVoices.find(v => v.lang.includes('en-US'));
+        }
+      } else {
+        // Hebrew text → prefer Avri
+        selectedVoice = allVoices.find(v => v.name.includes('Avri'));
+        if (!selectedVoice) {
+          // Fallback to selected voice in dropdown
+          const selectedIdx = parseInt(windowsVoiceSelect.value);
+          if (!isNaN(selectedIdx) && allVoices[selectedIdx]) {
+            selectedVoice = allVoices[selectedIdx];
+          }
+        }
+      }
+
+      // Update dropdown to reflect current voice
+      if (selectedVoice) {
+        const idx = allVoices.indexOf(selectedVoice);
+        if (idx !== -1) windowsVoiceSelect.value = idx;
+      }
+
+      return selectedVoice;
+    }
+
+    // ============================================================
+    //  AUDIO QUEUE & TTS PLAYBACK
+    // ============================================================
+
+    function sanitizeTextForTTS(text) {
+      return text.replace(/[*#\/`]/g, '').replace(/\n+/g, ' ').trim();
+    }
+
+    function addToSpeechQueue(text) {
+      const cleaned = sanitizeTextForTTS(text);
+      if (!cleaned) return;
+      audioQueue.push(cleaned);
+      processSpeechQueue();
+    }
+
+    function processSpeechQueue() {
+      if (isProcessingQueue || audioQueue.length === 0) return;
+      
+      const nextText = audioQueue.shift();
+      isProcessingQueue = true;
+      isAgentSpeaking = true;
+      setStatus('speaking', I18n.message('voice.speaking'));
+
+      const config = getConfig();
+
+      if (config.ttsEngine === 'windows') {
+        speakWithWindowsTTS(nextText);
+      } else if (config.ttsEngine === 'coqui') {
+        speakWithCoquiTTS(nextText);
+      } else {
+        // TTS off
+        onSpeechComplete();
+      }
+    }
+
+    function speakWithWindowsTTS(text) {
+      const config = getConfig();
+      const utterance = new SpeechSynthesisUtterance(text);
+      
+      // Smart voice selection
+      const voice = getVoiceForText(text);
+      if (voice) utterance.voice = voice;
+      
+      utterance.rate = config.ttsRate;
+
+      utterance.onstart = () => {
+        console.log(`[TTS] Speaking: "${text.substring(0, 50)}..." with voice: ${utterance.voice?.name || 'default'}`);
+      };
+
+      utterance.onend = () => {
+        console.log('[TTS] Finished sentence.');
+        onSpeechComplete();
+      };
+
+      utterance.onerror = (e) => {
+        console.error('[TTS] Error:', e);
+        onSpeechComplete();
+      };
+
+      speechSynthesis.speak(utterance);
+    }
+
+    async function speakWithCoquiTTS(text) {
+      try {
+        const response = await fetch('/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+
+        if (!response.ok) throw new Error('Coqui TTS failed');
+
+        const audioBlob = await response.blob();
+        currentAudioUrl = URL.createObjectURL(audioBlob);
+        currentAudio = new Audio(currentAudioUrl);
+
+        currentAudio.onplay = () => {
+          console.log(`[TTS-Coqui] Playing: "${text.substring(0, 50)}..."`);
+        };
+
+        currentAudio.onended = () => {
+          cleanupCurrentAudio();
+          onSpeechComplete();
+        };
+
+        currentAudio.onerror = (e) => {
+          console.error('[TTS-Coqui] Playback error:', e);
+          cleanupCurrentAudio();
+          onSpeechComplete();
+        };
+
+        await currentAudio.play();
+      } catch (err) {
+        console.error('[TTS-Coqui] Error:', err);
+        cleanupCurrentAudio();
+        onSpeechComplete();
+      }
+    }
+
+    function onSpeechComplete() {
+      isProcessingQueue = false;
+      
+      // If queue is empty, agent is done speaking
+      if (audioQueue.length === 0) {
+        isAgentSpeaking = false;
+        if (isActive) {
+          setStatus('listening', I18n.message('voice.listening'));
+        }
+      }
+
+      // Process next item in queue
+      processSpeechQueue();
+    }
+
+    function cleanupCurrentAudio() {
+      if (currentAudioUrl) {
+        URL.revokeObjectURL(currentAudioUrl);
+        currentAudioUrl = null;
+      }
+      currentAudio = null;
+    }
+
+    function forceStopSpeaking() {
+      // Clear queue and stop immediately
+      audioQueue.length = 0;
+      speechSynthesis.cancel();
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio = null;
+      }
+      if (currentAudioUrl) {
+        URL.revokeObjectURL(currentAudioUrl);
+        currentAudioUrl = null;
+      }
+      isProcessingQueue = false;
+      isAgentSpeaking = false;
+      if (isActive) {
+        setStatus('listening', I18n.message('voice.listening'));
+      }
+    }
+
+    // ============================================================
+    //  SETTINGS UI
+    // ============================================================
+
+    settingsToggle.onclick = () => settingsPanel.classList.toggle('open');
+
+    // Update slider displays
+    [
+      [vadStartSlider, 'vadStartValue', v => v],
+      [vadEndSlider, 'vadEndValue', v => v],
+      [silenceSlider, 'silenceValue', v => v + 's'],
+      [minSpeechSlider, 'minSpeechValue', v => v + 's'],
+      [maxSpeechSlider, 'maxSpeechValue', v => v + 's']
+    ].forEach(([slider, labelId, fmt]) => {
+      slider.oninput = () => document.getElementById(labelId).textContent = fmt(slider.value);
+    });
+
+    windowsTTSRate.oninput = () => {
+      windowsTTSRateValue.textContent = parseFloat(windowsTTSRate.value).toFixed(1);
+    };
+
+    // Show/hide Windows voice settings based on TTS engine
+    voiceTTS.onchange = () => {
+      windowsVoiceSettings.style.display = voiceTTS.value === 'windows' ? '' : 'none';
+    };
+
+    // Save voice selection to localStorage
+    windowsVoiceSelect.onchange = () => {
+      const idx = parseInt(windowsVoiceSelect.value);
+      if (!isNaN(idx) && allVoices[idx]) {
+        localStorage.setItem(VOICE_STORAGE_KEY, allVoices[idx].name);
+      }
+    };
+
+    refreshVoicesBtn.onclick = loadWindowsVoices;
+
+    // Load voices (may be async in some browsers)
+    speechSynthesis.onvoiceschanged = loadWindowsVoices;
+    loadWindowsVoices();
+
+    // Load models
+    async function loadModels() {
+      try {
+        const r = await fetch('/api/tags');
+        const data = await r.json();
+        const models = data.models || [];
+        voiceModel.innerHTML = '';
+        const saved = localStorage.getItem('modelSettings');
+        const defaultModel = saved ? JSON.parse(saved).textModel : '';
+        models.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.name;
+          opt.textContent = m.name;
+          if (m.name === defaultModel) opt.selected = true;
+          voiceModel.appendChild(opt);
+        });
+      } catch (e) {
+        voiceModel.innerHTML = '<option value="" data-i18n="models.loadFailed">Failed to load models</option>';
+      }
+    }
+    loadModels();
+
+    // Initialize TTS engine visibility
+    windowsVoiceSettings.style.display = voiceTTS.value === 'windows' ? '' : 'none';
+
+    // ============================================================
+    //  UI HELPERS
+    // ============================================================
+
+    function setStatus(state, text) {
+      orb.className = 'orb ' + state;
+      I18n.setText(statusText, text);
+      
+      const badges = {
+        '': [I18n.message('voice.inactive'), 'bg-slate-700'],
+        'listening': [I18n.message('voice.listeningBadge'), 'bg-indigo-600'],
+        'recording': [I18n.message('mic.recording'), 'bg-red-600'],
+        'processing': [I18n.message('voice.processingBadge'), 'bg-amber-600'],
+        'speaking': [I18n.message('voice.speakingBadge'), 'bg-emerald-600']
+      };
+      const [badgeText, badgeClass] = badges[state] || badges[''];
+      I18n.setText(statusBadge, badgeText);
+      statusBadge.className = `text-xs px-2 py-1 rounded-full text-white ${badgeClass}`;
+    }
+
+    function addTranscript(role, text) {
+      const placeholder = transcriptArea.querySelector('.text-center');
+      if (placeholder) placeholder.remove();
+
+      const div = document.createElement('div');
+      div.className = 'fade-in';
+      
+      if (role === 'user') {
+        div.innerHTML = `<div class="msg-user p-3 max-w-md mr-auto text-sm">
+          <div class="text-indigo-300 text-xs mb-1"><i class="fas fa-user"></i> <span data-i18n="chat.you">You</span></div>
+          <div data-user-content dir="auto">${I18n.escapeHtml(text)}</div>
+        </div>`;
+      } else if (role === 'assistant') {
+        div.innerHTML = `<div class="msg-assistant p-3 max-w-md ml-auto text-sm">
+          <div class="text-emerald-400 text-xs mb-1"><i class="fas fa-robot"></i> <span data-i18n="chat.assistant">Assistant</span></div>
+          <div data-user-content dir="auto">${I18n.escapeHtml(text)}</div>
+        </div>`;
+      } else {
+        div.innerHTML = `<div class="text-center text-slate-500 text-xs py-1"><i class="fas fa-info-circle"></i> ${text && typeof text === 'object' && text.key ? I18n.html(text) : I18n.escapeHtml(text)}</div>`;
+      }
+      
+      I18n.apply(div);
+      transcriptArea.appendChild(div);
+      transcriptArea.scrollTop = transcriptArea.scrollHeight;
+    }
+
+    // ============================================================
+    //  VAD RECORDER
+    // ============================================================
+
+    class VADRecorder {
+      constructor() {
+        this.reset();
+        this.preRollMaxFrames = 5;
+        this.resolve = null;
+        this._cancelled = false;
+      }
+
+      reset() {
+        this.audioChunks = [];
+        this.isStarted = false;
+        this.speechFrames = 0;
+        this.silenceFrames = 0;
+        this.totalFrames = 0;
+        this.preRollBuffer = [];
+        this._cancelled = false;
+      }
+
+      cancel() {
+        this._cancelled = true;
+        if (this.resolve) this.resolve(null);
+      }
+
+      processAudioFrame(audioData) {
+        if (this._cancelled) return;
+        
+        const config = getConfig();
+        const frameDurationMs = (audioData.length / SAMPLE_RATE) * 1000;
+        const silenceFramesNeeded = Math.max(1, Math.round(config.silenceDurationMs / frameDurationMs));
+        const minFrames = Math.max(1, Math.round(config.minSpeechDurationMs / frameDurationMs));
+        const maxFrames = config.maxSpeechDurationS > 0 
+          ? Math.max(1, Math.round((config.maxSpeechDurationS * 1000) / frameDurationMs)) 
+          : null;
+        const startThresholdFrames = 2;
+
+        // Calculate RMS
+        let sum = 0;
+        for (let i = 0; i < audioData.length; i++) {
+          sum += audioData[i] * audioData[i];
+        }
+        const rms = Math.sqrt(sum / audioData.length);
+
+        // Update volume display
+        const volumePct = Math.min(100, (rms / 0.1) * 100);
+        volumeBar.style.width = volumePct + '%';
+        if (rms > config.vadStartThreshold) {
+          volumeBar.style.backgroundColor = '#ef4444';
+          volumeRing.classList.add('active');
+        } else {
+          volumeBar.style.backgroundColor = '#6366f1';
+          volumeRing.classList.remove('active');
+        }
+
+        // If agent is speaking, discard recording
+        if (isAgentSpeaking) {
+          if (this.isStarted) {
+            this.reset();
+            setStatus('speaking', I18n.message('voice.waiting'));
+          }
+          return;
+        }
+
+        // Pre-roll buffer
+        this.preRollBuffer.push(new Float32Array(audioData));
+        if (this.preRollBuffer.length > this.preRollMaxFrames) {
+          this.preRollBuffer.shift();
+        }
+
+        if (!this.isStarted) {
+          if (rms >= config.vadStartThreshold) {
+            this.speechFrames++;
+          } else {
+            this.speechFrames = 0;
+          }
+
+          if (this.speechFrames >= startThresholdFrames) {
+            this.isStarted = true;
+            this.audioChunks = [...this.preRollBuffer];
+            this.preRollBuffer = [];
+            this.totalFrames = this.audioChunks.length;
+            setStatus('recording', I18n.message('voice.recording'));
+          }
+          return;
+        }
+
+        // Recording in progress
+        this.audioChunks.push(new Float32Array(audioData));
+        this.totalFrames++;
+
+        if (rms < config.vadEndThreshold) {
+          this.silenceFrames++;
+        } else {
+          this.silenceFrames = 0;
+        }
+
+        if (this.silenceFrames >= silenceFramesNeeded && this.totalFrames >= minFrames) {
+          this.finishRecording();
+          return;
+        }
+        if (maxFrames && this.totalFrames >= maxFrames) {
+          this.finishRecording();
+          return;
+        }
+      }
+
+      finishRecording() {
+        if (this.audioChunks.length === 0 || this._cancelled) {
+          if (this.resolve) this.resolve(null);
+          return;
+        }
+
+        const totalLength = this.audioChunks.reduce((acc, chunk) => acc + chunk.length, 0);
+        const fullAudio = new Float32Array(totalLength);
+        let offset = 0;
+        for (const chunk of this.audioChunks) {
+          fullAudio.set(chunk, offset);
+          offset += chunk.length;
+        }
+
+        const wavBlob = float32ToWavBlob(fullAudio, SAMPLE_RATE);
+        if (this.resolve) this.resolve(wavBlob);
+      }
+    }
+
+    // ============================================================
+    //  AUDIO UTILITIES
+    // ============================================================
+
+    function float32ToWavBlob(samples, sampleRate) {
+      const buffer = new ArrayBuffer(44 + samples.length * 2);
+      const view = new DataView(buffer);
+      writeString(view, 0, 'RIFF');
+      view.setUint32(4, 36 + samples.length * 2, true);
+      writeString(view, 8, 'WAVE');
+      writeString(view, 12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeString(view, 36, 'data');
+      view.setUint32(40, samples.length * 2, true);
+      for (let i = 0; i < samples.length; i++) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+      return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    function writeString(view, offset, str) {
+      for (let i = 0; i < str.length; i++) {
+        view.setUint8(offset + i, str.charCodeAt(i));
+      }
+    }
+
+    function blobToDataUrl(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // ============================================================
+    //  MAIN VOICE CHAT LOOP
+    // ============================================================
+
+    let vadRecorder = null;
+
+    async function startVoiceChat() {
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            sampleRate: SAMPLE_RATE,
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE });
+        const source = audioContext.createMediaStreamSource(mediaStream);
+        scriptProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+        
+        vadRecorder = new VADRecorder();
+
+        scriptProcessor.onaudioprocess = (e) => {
+          const inputData = e.inputBuffer.getChannelData(0);
+          vadRecorder.processAudioFrame(inputData);
+        };
+
+        source.connect(scriptProcessor);
+        scriptProcessor.connect(audioContext.destination);
+
+        isActive = true;
+        startBtn.classList.add('hidden');
+        stopBtn.classList.remove('hidden');
+        forceStopBtn.classList.remove('hidden');
+
+        addTranscript('system', I18n.message('voice.started'));
+        conversationLoop();
+        
+      } catch (err) {
+        console.error('Failed to start voice chat:', err);
+        addTranscript('system', I18n.message('voice.micError', { detail: I18n.errorDetail(err) }));
+        stopVoiceChat();
+      }
+    }
+
+    async function conversationLoop() {
+      while (isActive) {
+        try {
+          // Wait for agent to finish speaking
+          while (isAgentSpeaking && isActive) {
+            await sleep(200);
+          }
+          if (!isActive) break;
+
+          setStatus('listening', I18n.message('voice.listening'));
+          
+          // Record until silence (VAD)
+          vadRecorder.reset();
+          const audioBlob = await new Promise((resolve) => {
+            vadRecorder.resolve = resolve;
+          });
+
+          if (!isActive || !audioBlob) continue;
+
+          // Process the recording via streaming endpoint
+          setStatus('processing', I18n.message('voice.transcribing'));
+
+          const audioDataUrl = await blobToDataUrl(audioBlob);
+          const config = getConfig();
+
+          await processWithStreaming(audioDataUrl, config);
+
+        } catch (err) {
+          console.error('Conversation loop error:', err);
+          if (isActive) {
+            addTranscript('system', I18n.message('voice.error', { detail: I18n.errorDetail(err) }));
+            await sleep(1000);
+          }
+        }
+      }
+    }
+
+    /**
+     * Process audio via streaming SSE endpoint.
+     * Sentences are sent to TTS queue as they arrive from Ollama.
+     */
+    async function processWithStreaming(audioDataUrl, config) {
+      try {
+        // 1. תמלול דרך Whisper
+        setStatus('processing', I18n.message('voice.transcribing'));
+        const sttRes = await fetch('/transcribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ audio: audioDataUrl, language: config.language })
+        });
+        
+        if (!sttRes.ok) throw I18n.error('voice.transcribeFailed');
+        const sttData = await sttRes.json();
+
+        // אם אין טקסט משמעותי, חוזרים להאזנה
+        if (!sttData.text || sttData.text.length < 2) {
+          setStatus('listening', I18n.message('voice.noSpeech'));
+          return;
+        }
+
+        // מוסיפים את הטקסט של המשתמש לצ'אט
+        addTranscript('user', sttData.text);
+        conversationHistory.push({ role: 'user', content: sttData.text });
+
+        // 2. שליחה ל-Ollama
+        setStatus('processing', I18n.message('voice.generating'));
+        const chatRes = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: sttData.text,
+            model: config.model,
+            conversationId: conversationId
+          })
+        });
+
+        if (!chatRes.ok) throw I18n.error('voice.aiFailed');
+        const chatData = await chatRes.json();
+        
+        if (chatData.conversationId) conversationId = chatData.conversationId;
+        const aiText = chatData.message;
+
+        // מוסיפים את התשובה לצ'אט
+        addTranscript('assistant', aiText);
+        conversationHistory.push({ role: 'assistant', content: aiText });
+
+        // 3. שליחה לתור ההקראה (TTS)
+        if (config.ttsEngine !== 'off' && aiText) {
+          // מפרקים את התשובה למשפטים כדי שההקראה תתחיל מהר
+          const sentences = aiText.match(/[^.!?\n]+[.!?\n]+/g) || [aiText];
+          let firstSentence = true;
+          
+          sentences.forEach(sentence => {
+            if (sentence.trim()) {
+              addToSpeechQueue(sentence);
+              if (firstSentence) {
+                setStatus('speaking', I18n.message('voice.speaking'));
+                firstSentence = false;
+              }
+            }
+          });
+        } else {
+          // אם ה-TTS כבוי
+          onSpeechComplete();
+        }
+
+      } catch (err) {
+        console.error('Processing error:', err);
+        addTranscript('system', I18n.message('voice.error', { detail: I18n.errorDetail(err) }));
+        setStatus('listening', I18n.message('voice.listening'));
+      }
+    }
+
+    /**
+     * Create a live-updating assistant message element in the transcript.
+     * Returns the DOM element so we can update its text content.
+     */
+    function createLiveAssistantMsg() {
+      const placeholder = transcriptArea.querySelector('.text-center');
+      if (placeholder) placeholder.remove();
+
+      const div = document.createElement('div');
+      div.className = 'fade-in';
+      div.innerHTML = `<div class="msg-assistant p-3 max-w-md ml-auto text-sm">
+        <div class="text-emerald-400 text-xs mb-1"><i class="fas fa-robot"></i> <span data-i18n="chat.assistant">Assistant</span></div>
+        <span class="live-content" data-user-content dir="auto"></span><span class="typing-cursor" style="animation: blink 1s infinite;">▌</span>
+      </div>`;
+      transcriptArea.appendChild(div);
+      transcriptArea.scrollTop = transcriptArea.scrollHeight;
+
+      // Add cursor blink animation
+      const style = document.createElement('style');
+      style.textContent = '@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }';
+      if (!document.querySelector('style[data-cursor]')) {
+        style.setAttribute('data-cursor', '1');
+        document.head.appendChild(style);
+      }
+
+      return div;
+    }
+
+    orb.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        orb.click();
+      }
+    });
+
+    function stopVoiceChat() {
+      isActive = false;
+      
+      if (vadRecorder) {
+        vadRecorder.cancel();
+        vadRecorder = null;
+      }
+
+      if (scriptProcessor) {
+        scriptProcessor.disconnect();
+        scriptProcessor = null;
+      }
+
+      if (audioContext) {
+        audioContext.close().catch(() => {});
+        audioContext = null;
+      }
+
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+
+      forceStopSpeaking();
+
+      startBtn.classList.remove('hidden');
+      stopBtn.classList.add('hidden');
+      forceStopBtn.classList.add('hidden');
+      setStatus('', I18n.message('voice.ready'));
+      volumeBar.style.width = '0%';
+    }
+
+    // ============================================================
+    //  EVENT HANDLERS
+    // ============================================================
+
+    startBtn.onclick = startVoiceChat;
+    stopBtn.onclick = stopVoiceChat;
+    forceStopBtn.onclick = forceStopSpeaking;
+    
+    orb.onclick = () => {
+      if (isActive) stopVoiceChat();
+      else startVoiceChat();
+    };
+
+    clearBtn.onclick = () => {
+      transcriptArea.innerHTML = `<div class="text-center text-slate-500 text-sm py-8">
+        <i class="fas fa-comments text-3xl mb-3 block text-slate-600"></i>
+        <span data-i18n="voice.empty">Click the button below to start a conversation</span>
+      </div>`;
+      conversationHistory = [];
+      conversationId = null;
+    };
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.target !== document.body) return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (isActive) stopVoiceChat();
+        else startVoiceChat();
+      }
+      if (e.code === 'Escape' && isAgentSpeaking) {
+        forceStopSpeaking();
+      }
+    });
+
+    window.addEventListener('beforeunload', stopVoiceChat);
+  </script>
+</body>
+</html>

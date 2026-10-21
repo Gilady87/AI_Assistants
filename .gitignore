@@ -1,0 +1,14 @@
+Pics/
+node_modules/
+admin_config.json
+admin_tools.json
+admin_logs.txt
+agent_memory.db*
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+.tmp-*/
+frames.txt

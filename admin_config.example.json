@@ -1,0 +1,12 @@
+{
+  "OLLAMA_HOST": "http://localhost:11434",
+  "DEFAULT_MODEL": "gemma3:4b",
+  "TTS_HOST": "http://localhost:5002",
+  "WHISPER_HOST": "http://localhost:9000",
+  "OPENAI_KEY": "",
+  "XAI_API_KEY": "",
+  "ELEVENLABS_API_KEY": "",
+  "LISTEN_HOST": "127.0.0.1",
+  "PORT": 3001,
+  "MAX_BODY_MB": 10
+}

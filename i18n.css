@@ -1,0 +1,33 @@
+html.i18n-loading body { visibility: hidden; }
+.ui-language-toggle { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; border: 1px solid #818cf8; border-radius: 8px; padding: 2px; }
+.ui-language-toggle button { font: inherit; font-size: 12px; font-weight: 600; padding: 5px 8px; border-radius: 5px; background: transparent; color: inherit; cursor: pointer; }
+.ui-language-toggle button[aria-pressed="true"] { background: #4f46e5; color: #fff; }
+.ui-language-toggle button:focus-visible { outline: 2px solid #818cf8; outline-offset: 2px; }
+header { flex-wrap: wrap; gap: 8px; }
+header > div { min-width: 0; flex-wrap: wrap; }
+[dir="ltr"] .fa-arrow-right { transform: rotate(180deg); }
+.markdown-content ul, .markdown-content ol { margin-inline-start: 1.5rem; margin-inline-end: 0; }
+.markdown-content blockquote { border-inline-start: 4px solid #c7d2fe; border-inline-end: 0; padding-inline-start: 1rem; padding-inline-end: 0; }
+[dir="ltr"] #historySidebar { right: auto; left: 0; border-left: 0; border-right: 1px solid #e5e7eb; }
+[dir="ltr"] .slide-in { animation-name: slideInLtr; }
+[dir="ltr"] .slide-out { animation-name: slideOutLtr; }
+@keyframes slideInLtr { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes slideOutLtr { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+[dir="ltr"] #refreshModelsBtn { left: auto; right: 0.5rem; }
+#textModelSelect { padding-inline-end: 2.5rem; }
+[data-user-content] { unicode-bidi: plaintext; }
+[data-user-content] pre, [data-user-content] code, .code-block { direction: ltr; text-align: left; unicode-bidi: isolate; }
+[dir="ltr"] aside { border-left: 0; border-right: 1px solid #333755; }
+[dir="ltr"] .ml-1 { margin-left: 0; margin-right: 0.25rem; }
+[dir="ltr"] .ml-2 { margin-left: 0; margin-right: 0.5rem; }
+[dir="rtl"] .mr-1 { margin-right: 0; margin-left: 0.25rem; }
+[dir="ltr"] .msg-user { margin-right: 0; margin-left: auto; }
+[dir="ltr"] .msg-assistant { margin-left: 0; margin-right: auto; }
+@media (max-width: 640px) {
+  body.admin-page { flex-direction: column; }
+  .admin-page aside { width: 100%; min-height: auto; position: static; border-inline: 0; }
+  .admin-page aside nav { display: flex; flex-wrap: wrap; gap: 4px; }
+  .admin-page main { padding: 1rem; }
+  .admin-page .flex.justify-between { flex-wrap: wrap; gap: 8px; }
+  #activeModelBadge { max-width: 10rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
